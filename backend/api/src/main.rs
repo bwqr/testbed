@@ -4,35 +4,13 @@ use actix_web::{App, get, http::header, HttpRequest, HttpResponse, HttpServer, m
 use actix_web_actors::ws;
 use actix_web_actors::ws::{Message, WebsocketContext, ProtocolError};
 
-struct WSSession;
+mod experiment;
 
-impl Actor for WSSession {
-    type Context = WebsocketContext<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {}
-
-    fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
-        Running::Stop
-    }
-}
-
-impl StreamHandler<Result<Message, ProtocolError>> for WSSession {
-    fn handle(&mut self, msg: Result<Message, ProtocolError>, ctx: &mut Self::Context) {
-        let msg = match msg {
-            Ok(m) => m,
-            Err(_) => {
-                ctx.stop();
-                return;
-            }
-        };
-
-        println!("{:?}", msg);
-    }
-}
+use experiment::session::Session;
 
 #[get("/ws")]
 pub async fn join_server(req: HttpRequest, stream: web::Payload) -> actix_web::Result<HttpResponse> {
-    ws::start(WSSession, &req, stream)
+    ws::start(Session {}, &req, stream)
 }
 
 #[actix_web::main]
