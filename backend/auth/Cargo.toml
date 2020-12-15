@@ -1,13 +1,5 @@
-[workspace]
-members = [
-    "api",
-    "auth",
-    "core",
-    "experiment",
-    "user"
-]
 [package]
-name = "backend"
+name = "auth"
 version = "0.1.0"
 authors = ["bwqr <ruzgardeniz.08@hotmail.com>"]
 edition = "2018"

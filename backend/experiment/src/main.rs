@@ -1,40 +1,38 @@
-use actix::{Actor, Arbiter, StreamHandler, System};
-use actix::io::SinkWrite;
-use awc::Client;
-use futures::StreamExt;
-use log::{error, log};
+use actix::{Actor, Arbiter, System};
 
-use crate::session::Session;
+use crate::connection::Connection;
+use crate::executor::Executor;
+use crate::messages::{UpdateConnectionMessage, UpdateExecutorMessage};
 
-pub mod session;
+mod connection;
+mod executor;
+mod messages;
 
 fn main() {
     // Load .env
     dotenv::dotenv().ok();
+
+    let access_key = std::env::var("BACKEND_ACCESS_KEY").expect("BACKEND_ACCESS_KEY is not provided in env");
+    let server_url = std::env::var("SERVER_URL").expect("SERVER_URL is not provided in env");
 
     // Enable logger
     env_logger::init();
 
     let sys = System::new("websocket-client");
 
-    Arbiter::spawn(async {
-        let (response, framed) = Client::new()
-            .ws(std::env::var("SERVER_URL").expect("SERVER_URL is not provided in env"))
-            .connect()
+    Arbiter::spawn(async move {
+        let connection = Connection::new(server_url, access_key).start();
+        let executor = Executor::new().start();
+
+        connection
+            .send(UpdateExecutorMessage { executor: executor.clone() })
             .await
-            .map_err(|e| {
-                error!("{:?}", e);
-            })
             .unwrap();
 
-        println!("{:?}", response);
-
-        let (sink, stream) = framed.split();
-
-        let addr = Session::create(|ctx| {
-            Session::add_stream(stream, ctx);
-            Session::new(SinkWrite::new(sink, ctx))
-        });
+        executor
+            .send(UpdateConnectionMessage { connection: connection.clone() })
+            .await
+            .unwrap();
     });
 
     sys.run().unwrap();

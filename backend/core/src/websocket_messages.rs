@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::ModelId;
-
 #[derive(Deserialize, Serialize)]
 pub enum SocketMessageKind {
     RegisterBackend,
@@ -18,13 +16,11 @@ pub struct SocketMessage<T> {
     pub data: T,
 }
 
-pub mod bidirect {
+pub mod server {
     use super::{Deserialize, Serialize};
-    use super::ModelId;
 
     #[derive(Deserialize, Serialize)]
     pub struct RegisterBackend {
-        pub id: ModelId,
         pub access_key: String,
     }
 }

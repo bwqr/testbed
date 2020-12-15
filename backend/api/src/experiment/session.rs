@@ -1,13 +1,24 @@
-use actix::{Actor, ActorContext, Running, StreamHandler};
+use actix::{Actor, ActorContext, Addr, StreamHandler};
 use actix_web_actors::ws::{Message, ProtocolError, WebsocketContext};
+use log::error;
 
-use core::messages::{BaseMessage, SocketMessage, SocketMessageKind};
-use core::messages::bidirect::RegisterBackend;
+use core::websocket_messages::{BaseMessage, SocketMessage, SocketMessageKind};
+use core::websocket_messages::server::RegisterBackend;
 use core::SocketErrorKind;
 
-pub struct Session {}
+use crate::experiment::server::ExperimentServer;
+
+pub struct Session {
+    experiment_server: Addr<ExperimentServer>
+}
 
 impl Session {
+    pub fn new(experiment_server: Addr<ExperimentServer>) -> Self {
+        Session {
+            experiment_server
+        }
+    }
+
     fn handle_msg(&self, msg: Message, ctx: &mut WebsocketContext<Self>) -> Result<(), SocketErrorKind> {
         match msg {
             Message::Ping(_) => {
@@ -26,7 +37,9 @@ impl Session {
                     SocketMessageKind::RegisterBackend => {
                         let register_backend = serde_json::from_str::<'_, SocketMessage<RegisterBackend>>(text)
                             .map_err(|_| SocketErrorKind::InvalidMessage)?;
-                        println!("id: {}, access_key: {}", register_backend.data.id, register_backend.data.access_key)
+                        println!("access_key: {}", register_backend.data.access_key);
+
+                        ctx.text("How are you");
                     }
                 }
             }
@@ -41,9 +54,9 @@ impl Session {
 impl Actor for Session {
     type Context = WebsocketContext<Self>;
 
-    fn started(&mut self, ctx: &mut Self::Context) {}
+    fn started(&mut self, _: &mut Self::Context) {}
 
-    fn stopped(&mut self, ctx: &mut Self::Context) {}
+    fn stopped(&mut self, _: &mut Self::Context) {}
 }
 
 impl StreamHandler<Result<Message, ProtocolError>> for Session {
@@ -57,6 +70,7 @@ impl StreamHandler<Result<Message, ProtocolError>> for Session {
         };
 
         if let Err(e) = self.handle_msg(msg, ctx) {
+            error!("{:?}", e);
             // ctx.text(e.value());
         }
     }
