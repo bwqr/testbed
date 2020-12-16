@@ -16,6 +16,7 @@ pub fn register(config: &mut web::ServiceConfig) {
                 .wrap(Auth)
                 .service(handlers::fetch_profile)
                 .service(handlers::update_profile)
+                .service(handlers::update_password)
         );
 }
 

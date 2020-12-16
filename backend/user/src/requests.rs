@@ -11,3 +11,8 @@ pub struct UpdateProfileRequest {
     pub first_name: String,
     pub last_name: String,
 }
+
+#[derive(Deserialize)]
+pub struct UpdatePasswordRequest {
+    pub password: String
+}
