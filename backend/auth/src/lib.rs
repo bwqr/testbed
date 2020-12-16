@@ -13,6 +13,9 @@ pub fn register(config: &mut web::ServiceConfig) {
             web::scope("/api/auth")
                 .service(handlers::login)
                 .service(handlers::sign_up)
+                .service(handlers::forgot_password)
+                .service(handlers::reset_password)
+                .service(handlers::verify_account)
         );
 }
 

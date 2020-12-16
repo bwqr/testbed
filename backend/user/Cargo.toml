@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 core = { path = "../core" }
+derive = { path = "../derive" }
 
 actix-web = "3"
 

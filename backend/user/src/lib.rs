@@ -1,9 +1,13 @@
+#[macro_use]
+extern crate diesel;
+
 use actix_web::web;
 
 use core::middlewares::auth::Auth;
 
-pub mod handlers;
+mod handlers;
 pub mod models;
+mod requests;
 
 pub fn register(config: &mut web::ServiceConfig) {
     config
@@ -11,6 +15,7 @@ pub fn register(config: &mut web::ServiceConfig) {
             web::scope("/api/user")
                 .wrap(Auth)
                 .service(handlers::fetch_profile)
+                .service(handlers::update_profile)
         );
 }
 

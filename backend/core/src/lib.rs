@@ -39,6 +39,7 @@ pub enum ErrorMessage {
     UnknownError,
     HashFailed,
     AskamaError,
+    InvalidOperationForStatus,
 }
 
 impl ErrorMessaging for ErrorMessage {
@@ -98,6 +99,11 @@ impl ErrorMessaging for ErrorMessage {
                 code: StatusCode::INTERNAL_SERVER_ERROR,
                 error_code: 91,
                 message: String::from("internal_server_error"),
+            },
+            ErrorMessage::InvalidOperationForStatus => HttpError {
+                code: StatusCode::UNPROCESSABLE_ENTITY,
+                error_code: 112,
+                message: String::from("invalid_operation_for_status"),
             }
         }
     }

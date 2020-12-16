@@ -40,3 +40,20 @@ impl SignUpRequest {
         }
     }
 }
+
+#[derive(Deserialize, Sanitize)]
+pub struct ForgotPasswordRequest {
+    pub email: String
+}
+
+#[derive(Deserialize, Sanitize, Validate)]
+pub struct ResetPasswordRequest {
+    pub token: String,
+    #[validate(length(min = 8, max = 128))]
+    pub password: String,
+}
+
+#[derive(Deserialize, Sanitize)]
+pub struct VerifyAccountRequest {
+    pub token: String
+}
