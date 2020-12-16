@@ -8,7 +8,9 @@ edition = "2018"
 
 [dependencies]
 core = { path = "../core" }
-user = { path = "../user"}
+user = { path = "../user" }
+auth = { path = "../auth" }
+service = { path = "../service" }
 
 actix = "0.10"
 actix-web = "3"

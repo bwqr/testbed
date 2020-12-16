@@ -11,6 +11,7 @@ table! {
         first_name -> Varchar,
         last_name -> Varchar,
         email -> Varchar,
+        password -> Varchar,
         status -> Varchar,
         role_id -> Int4,
     }

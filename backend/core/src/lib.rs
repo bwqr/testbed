@@ -6,6 +6,7 @@ extern crate lazy_static;
 use std::fmt::Debug;
 
 use actix_web::http::StatusCode;
+pub use htmlescape::encode_minimal;
 
 use crate::error::{ErrorMessaging, HttpError};
 
@@ -13,6 +14,8 @@ pub mod db;
 pub mod error;
 pub mod middlewares;
 pub mod models;
+pub mod responses;
+pub mod sanitized;
 pub mod schema;
 pub mod types;
 pub mod utils;
@@ -34,6 +37,8 @@ pub enum ErrorMessage {
     UniqueViolation,
     ItemNotFound,
     UnknownError,
+    HashFailed,
+    AskamaError,
 }
 
 impl ErrorMessaging for ErrorMessage {
@@ -74,6 +79,11 @@ impl ErrorMessaging for ErrorMessage {
                 error_code: 110,
                 message: String::from("unique_violation"),
             },
+            ErrorMessage::HashFailed => HttpError {
+                code: StatusCode::INTERNAL_SERVER_ERROR,
+                error_code: 107,
+                message: String::from("hash_failed"),
+            },
             ErrorMessage::ItemNotFound => HttpError {
                 code: StatusCode::NOT_FOUND,
                 error_code: 101,
@@ -83,9 +93,20 @@ impl ErrorMessaging for ErrorMessage {
                 code: StatusCode::INTERNAL_SERVER_ERROR,
                 error_code: 103,
                 message: String::from("unknown_error"),
+            },
+            ErrorMessage::AskamaError => HttpError {
+                code: StatusCode::INTERNAL_SERVER_ERROR,
+                error_code: 91,
+                message: String::from("internal_server_error"),
             }
         }
     }
+}
+
+pub struct Config {
+    pub web_app_url: String,
+    pub app_url: String,
+    pub storage_path: String,
 }
 
 #[cfg(test)]

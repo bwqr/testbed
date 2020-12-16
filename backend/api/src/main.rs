@@ -1,6 +1,9 @@
 #[macro_use]
 extern crate lazy_static;
 
+use std::sync::Arc;
+use std::sync::mpsc::channel;
+
 use actix::prelude::*;
 use actix_cors::Cors;
 use actix_web::{App, get, http::header, HttpRequest, HttpResponse, HttpServer, middleware, web};
@@ -8,10 +11,12 @@ use actix_web_actors::ws;
 use diesel::{PgConnection, r2d2};
 use diesel::r2d2::ConnectionManager;
 
+use core::Config;
 use core::error::Algorithm;
 use core::types::DBPool;
 use core::utils::Hash;
 use experiment::session::Session;
+use service::{ClientServices, MailClient, MailClientMock, MailService, SendMailMessage};
 
 use crate::experiment::server::ExperimentServer;
 
@@ -27,6 +32,34 @@ fn setup_database() -> DBPool {
     let pool = r2d2::Pool::builder().build(manager).expect("Failed to create pool.");
 
     pool
+}
+
+fn setup_services() -> ClientServices {
+    // mail service
+    let send_mail_recipient: Recipient<SendMailMessage> = if std::env::var("ENV").expect("ENV is not provided in env") == "prod" {
+        let (mail_tx, mail_rx) = channel::<Recipient<SendMailMessage>>();
+        std::thread::Builder::new().name("mail_client".to_string()).spawn(move || {
+            let sys = System::new("mail_client");
+            let mail_client = MailClient::new(
+                std::env::var("MAIL_ADDRESS").expect("MAIL_ADDRESS is not provided in env"),
+                std::env::var("MAILGUN_ENDPOINT").expect("MAILGUN_ENDPOINT is not provided in env"),
+                std::env::var("MAILGUN_KEY").expect("MAILGUN_KEY is not provided in env"),
+            )
+                .expect("MailClient failed to init").start().recipient();
+            mail_tx.send(mail_client).expect("Failed to send MailClient from thread");
+            sys.run()
+        }).expect("Failed to initialize thread");
+
+        mail_rx.recv().expect("Failed to receive MailClient from thread")
+    } else {
+        MailClientMock::new().start().recipient()
+    };
+
+    let mail_service = MailService::new(send_mail_recipient);
+
+    ClientServices {
+        mail: mail_service
+    }
 }
 
 #[get("/ws")]
@@ -45,10 +78,19 @@ async fn main() -> std::io::Result<()> {
     // Setup database
     let pool = setup_database();
 
+    // Setup services
+    let client_services = setup_services();
+
     // Create utils
     let hash = Hash::new(&*SECRET_KEY, Algorithm::HS256);
 
     let experiment_server = ExperimentServer::new().start();
+
+    let config = Arc::new(Config {
+        web_app_url: std::env::var("WEB_APP_URL").expect("WEB_APP_URL is not provided in env"),
+        app_url: std::env::var("APP_URL").expect("APP_URL is not provided in env"),
+        storage_path: std::env::var("STORAGE_PATH").expect("STORAGE_PATH is not provided in env"),
+    });
 
     let srv = HttpServer::new(move || {
         let cors = Cors::default()
@@ -63,7 +105,10 @@ async fn main() -> std::io::Result<()> {
             .data(experiment_server.clone())
             .data(hash.clone())
             .data(pool.clone())
+            .data(config.clone())
+            .data(client_services.clone())
             .configure(user::register)
+            .configure(auth::register)
             .service(join_server)
     })
         .bind(std::env::var("APP_BIND_ADDRESS").expect("APP_BIND_ADDRESS is not provided in env").as_str())?;

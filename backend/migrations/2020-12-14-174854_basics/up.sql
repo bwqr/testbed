@@ -1,15 +1,19 @@
 -- Your SQL goes here
 create table roles
 (
-    id   integer PRIMARY KEY NOT NULL,
-    name varchar(255)        NOT NULL UNIQUE
+    id   serial PRIMARY KEY NOT NULL,
+    name varchar(255)       NOT NULL UNIQUE
 );
+
+insert into roles (name)
+values ('admin'),
+       ('user');
 
 create table users
 (
-    id         integer PRIMARY KEY NOT NULL,
-    first_name varchar(255)        NOT NULL,
-    last_name  varchar(255)        NOT NULL,
+    id         serial PRIMARY KEY  NOT NULL,
+    first_name varchar(122)        NOT NULL,
+    last_name  varchar(122)        NOT NULL,
     email      varchar(255) UNIQUE NOT NULL,
     password   varchar(88)         NOT NULL,
     status     varchar(11)         NOT NULL DEFAULT 'NotVerified' CHECK ( status in ('NotVerified', 'Verified', 'Banned') ),

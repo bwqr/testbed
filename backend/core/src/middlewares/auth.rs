@@ -5,7 +5,7 @@ use futures::task::{Context, Poll};
 use regex::Regex;
 
 use crate::ErrorMessage;
-use crate::models::AuthToken;
+use crate::models::token::AuthToken;
 use crate::utils::{Hash, JWTErrorKind};
 use crate::error::ErrorMessaging;
 

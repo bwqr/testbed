@@ -1,6 +1,6 @@
 use actix_web::{error::BlockingError, FromRequest, HttpRequest, HttpResponse, web};
 use actix_web::dev::Payload;
-use diesel::{Identifiable, Queryable};
+use diesel::{Identifiable, Insertable, Queryable};
 use diesel::pg::Pg;
 use diesel::prelude::*;
 use diesel::result::Error;
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use core::db::DieselEnum;
 use core::error::ErrorMessaging;
 use core::ErrorMessage;
-use core::models::AuthToken;
+use core::models::token::AuthToken;
 use core::schema::users;
 use core::types::{DBPool, ModelId};
 
@@ -22,8 +22,15 @@ pub struct User {
     pub first_name: String,
     pub last_name: String,
     pub email: String,
+    pub password: String,
     pub status: UserStatus,
     pub role_id: ModelId,
+}
+
+impl User {
+    pub fn full_name(&self) -> String {
+        self.first_name.clone() + " " + self.last_name.as_str()
+    }
 }
 
 impl FromRequest for User {
@@ -77,4 +84,14 @@ impl Queryable<VarChar, Pg> for UserStatus {
     fn build(row: Self::Row) -> Self {
         Self::build_from_string(row)
     }
+}
+
+#[derive(Insertable)]
+#[table_name = "users"]
+pub struct UserInsert {
+    pub first_name: String,
+    pub last_name: String,
+    pub email: String,
+    pub password: String,
+    pub role_id: ModelId,
 }
