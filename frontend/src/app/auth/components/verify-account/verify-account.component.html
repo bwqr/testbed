@@ -1,0 +1,11 @@
+<div *ngIf="ready">
+  <ng-container *ngIf="isSuccessful; else error">
+    Successfully verified
+  </ng-container>
+  <ng-template #error>
+    <app-error-message [errorMessage]="errorMessage" *ngIf="errorMessage; else unknownError"></app-error-message>
+    <ng-template #unknownError>
+      Unknown Error
+    </ng-template>
+  </ng-template>
+</div>

@@ -1,0 +1,6 @@
+<app-error-message [errorMessage]="errorMessage" *ngIf="errorMessage"></app-error-message>
+<form [formGroup]="formGroup" (ngSubmit)="login(formGroup.value)">
+  <input type="email" formControlName="email" placeholder="Email">
+  <input type="password" formControlName="password" placeholder="Password">
+  <button type="submit" [disabled]="!formGroup.valid || isInProcessingState">Login</button>
+</form>
