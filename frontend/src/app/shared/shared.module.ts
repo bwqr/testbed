@@ -3,13 +3,15 @@ import {CommonModule} from '@angular/common';
 import {MainComponent} from './components/main/main.component';
 import {ReactiveFormsModule} from '@angular/forms';
 import {HttpClientModule} from '@angular/common/http';
-import { ErrorMessageComponent } from './components/error-message/error-message.component';
+import {ErrorMessageComponent} from './components/error-message/error-message.component';
+import {FormValidityDirective} from './directives/form-validity.directive';
 
 
 @NgModule({
   declarations: [
     MainComponent,
-    ErrorMessageComponent
+    ErrorMessageComponent,
+    FormValidityDirective,
   ],
   imports: [
     CommonModule,
@@ -17,7 +19,8 @@ import { ErrorMessageComponent } from './components/error-message/error-message.
   exports: [
     ReactiveFormsModule,
     HttpClientModule,
-    ErrorMessageComponent
+    ErrorMessageComponent,
+    FormValidityDirective,
   ]
 })
 export class SharedModule {

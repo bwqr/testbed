@@ -3,4 +3,10 @@
   <p>{{user.firstName}}</p>
   <p>{{user.lastName}}</p>
   <p>{{user.email}}</p>
+
+  <form [formGroup]="formGroup" (ngSubmit)="updateProfile(formGroup.value)">
+    <input formControlName="firstName" type="text" appFormValidity>
+    <input formControlName="lastName" type="text" appFormValidity>
+    <button [disabled]="!formGroup.valid || isInProcessingState">Update</button>
+  </form>
 </div>

@@ -1,8 +1,10 @@
-<app-error-message [errorMessage]="errorMessage" *ngIf="errorMessage"></app-error-message>
-<form [formGroup]="formGroup" (ngSubmit)="signUp(formGroup.value)">
-  <input type="text" formControlName="firstName" placeholder="First Name">
-  <input type="email" formControlName="lastName" placeholder="Last Name">
-  <input type="email" formControlName="email" placeholder="Email">
-  <input type="password" formControlName="password" placeholder="Password">
-  <button type="submit" [disabled]="!formGroup.valid || isInProcessingState">Login</button>
-</form>
+<div>
+  <app-error-message [errorMessage]="errorMessage" *ngIf="errorMessage"></app-error-message>
+  <form [formGroup]="formGroup" (ngSubmit)="signUp(formGroup.value)">
+    <input type="text" formControlName="firstName" placeholder="First Name" appFormValidity>
+    <input type="email" formControlName="lastName" placeholder="Last Name" appFormValidity>
+    <input type="email" formControlName="email" placeholder="Email" appFormValidity>
+    <input type="password" formControlName="password" placeholder="Password" appFormValidity>
+    <button type="submit" [disabled]="!formGroup.valid || isInProcessingState">Login</button>
+  </form>
+</div>

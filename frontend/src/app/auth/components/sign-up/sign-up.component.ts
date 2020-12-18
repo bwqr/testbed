@@ -25,10 +25,10 @@ export class SignUpComponent extends MainComponent implements OnInit {
     super();
 
     this.formGroup = formBuilder.group({
-      firstName: formBuilder.control('', [Validators.required]),
-      lastName: formBuilder.control('', [Validators.required]),
+      firstName: formBuilder.control('', [Validators.required, Validators.maxLength(122)]),
+      lastName: formBuilder.control('', [Validators.required, Validators.maxLength(122)]),
       email: formBuilder.control('', [Validators.required, Validators.email]),
-      password: formBuilder.control('', [Validators.required]),
+      password: formBuilder.control('', [Validators.required, Validators.minLength(8), Validators.maxLength(128)]),
     });
   }
 

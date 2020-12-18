@@ -3,6 +3,7 @@ import {environment} from '../environments/environment';
 export const routes = {
   user: {
     profile: environment.apiEndpoint + '/user/profile',
+    password: environment.apiEndpoint + '/user/password'
   },
   auth: {
     login: environment.apiEndpoint + '/auth/login',

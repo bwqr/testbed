@@ -36,7 +36,7 @@ export class ResetPasswordComponent extends MainComponent implements OnInit {
     super();
 
     this.formGroup = formBuilder.group({
-      password: formBuilder.control('', [Validators.required]),
+      password: formBuilder.control('', [Validators.required, Validators.minLength(8), Validators.maxLength(128)]),
       passwordConfirm: formBuilder.control('', [Validators.required, passwordMatchValidator])
     });
   }
@@ -86,4 +86,3 @@ const passwordMatchValidator: ValidatorFn = (control: FormGroup): ValidationErro
 
   return control.value !== password.value ? {passwordMismatch: true} : null;
 };
-

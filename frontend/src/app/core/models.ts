@@ -47,27 +47,29 @@ export class ValidationErrorMessage extends ErrorMessage {
 
     this.validationErrors = [];
 
-    for (const e in message.validationErrors) {
-      if (message.validationErrors.hasOwnProperty(e)) {
-        const err = message.validationErrors[e];
+    for (const field in message.validationErrors) {
+      if (message.validationErrors.hasOwnProperty(field)) {
 
-        let localized;
-        if (err.code in locales.errors.validationErrors) {
-          localized = locales.errors.validationErrors[err.code];
-        } else {
-          localized = err.code;
-        }
+        for (const err of message.validationErrors[field]) {
 
-        this.validationErrors.push({
-          key: err.code,
-          localized
-        });
+          let localized;
+          if (err.code in locales.errors.validationErrors) {
+            localized = locales.errors.validationErrors[err.code];
+          } else {
+            localized = err.code;
+          }
 
-        // Show first validation error in message
-        if (this.validationErrors.length > 0) {
-          this.message = this.validationErrors[0];
+          this.validationErrors.push({
+            key: err.code,
+            localized
+          });
         }
       }
+    }
+
+    // Show first validation error in message
+    if (this.validationErrors.length > 0) {
+      this.message = this.validationErrors[0];
     }
   }
 }

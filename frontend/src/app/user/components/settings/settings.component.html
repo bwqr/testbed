@@ -1,0 +1,7 @@
+<div>
+  <form [formGroup]="formGroup" (ngSubmit)="updatePassword(formGroup.value)">
+    <input type="password" formControlName="password" appFormValidity>
+    <input type="password" formControlName="passwordConfirm" appFormValidity>
+    <button type="submit" [disabled]="!formGroup.valid || isInProcessingState">Update Password</button>
+  </form>
+</div>
