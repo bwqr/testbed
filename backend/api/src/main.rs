@@ -95,6 +95,7 @@ async fn main() -> std::io::Result<()> {
     let srv = HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin(std::env::var("ALLOWED_ORIGIN").expect("ALLOWED_ORIGIN is not provided in env").as_str())
+            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
             .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE])
             .allowed_header("enctype")
             .max_age(60);
