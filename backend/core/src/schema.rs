@@ -1,4 +1,15 @@
 table! {
+    experiments (id) {
+        id -> Int4,
+        user_id -> Int4,
+        name -> Varchar,
+        status -> Varchar,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+table! {
     roles (id) {
         id -> Int4,
         name -> Varchar,
@@ -17,9 +28,11 @@ table! {
     }
 }
 
+joinable!(experiments -> users (user_id));
 joinable!(users -> roles (role_id));
 
 allow_tables_to_appear_in_same_query!(
+    experiments,
     roles,
     users,
 );

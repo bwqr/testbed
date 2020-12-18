@@ -367,16 +367,14 @@ dependencies = [
  "actix",
  "actix-cors",
  "actix-web",
- "actix-web-actors",
  "auth",
  "core",
  "diesel",
  "dotenv",
  "env_logger",
+ "experiment",
  "lazy_static",
  "log",
- "serde",
- "serde_json",
  "service",
  "user",
 ]
@@ -838,16 +836,16 @@ name = "experiment"
 version = "0.1.0"
 dependencies = [
  "actix",
- "actix-codec",
- "awc",
- "bytes 0.6.0",
+ "actix-web",
+ "actix-web-actors",
+ "chrono",
  "core",
- "dotenv",
- "env_logger",
- "futures",
+ "derive",
+ "diesel",
  "log",
  "serde",
  "serde_json",
+ "user",
 ]
 
 [[package]]
@@ -2012,6 +2010,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dfed899f0eb03f32ee8c6a0aabdb8a7949659e3466561fc0adf54e26d88c5f4"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "testbed"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "actix-codec",
+ "awc",
+ "bytes 0.6.0",
+ "core",
+ "dotenv",
+ "env_logger",
+ "futures",
+ "log",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

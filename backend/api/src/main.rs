@@ -6,8 +6,7 @@ use std::sync::mpsc::channel;
 
 use actix::prelude::*;
 use actix_cors::Cors;
-use actix_web::{App, get, http::header, HttpRequest, HttpResponse, HttpServer, middleware, web};
-use actix_web_actors::ws;
+use actix_web::{App, http::header, HttpServer, middleware};
 use diesel::{PgConnection, r2d2};
 use diesel::r2d2::ConnectionManager;
 
@@ -15,12 +14,8 @@ use core::Config;
 use core::error::Algorithm;
 use core::types::DBPool;
 use core::utils::Hash;
-use experiment::session::Session;
+use experiment::ExperimentServer;
 use service::{ClientServices, MailClient, MailClientMock, MailService, SendMailMessage};
-
-use crate::experiment::server::ExperimentServer;
-
-mod experiment;
 
 lazy_static! {
     static ref SECRET_KEY: String = std::env::var("SECRET_KEY").expect("SECRET_KEY is not provided in env");
@@ -60,11 +55,6 @@ fn setup_services() -> ClientServices {
     ClientServices {
         mail: mail_service
     }
-}
-
-#[get("/ws")]
-pub async fn join_server(experiment_server: web::Data<Addr<ExperimentServer>>, req: HttpRequest, stream: web::Payload) -> actix_web::Result<HttpResponse> {
-    ws::start(Session::new(experiment_server.get_ref().clone()), &req, stream)
 }
 
 #[actix_web::main]
@@ -110,7 +100,7 @@ async fn main() -> std::io::Result<()> {
             .data(client_services.clone())
             .configure(user::register)
             .configure(auth::register)
-            .service(join_server)
+            .configure(experiment::register)
     })
         .bind(std::env::var("APP_BIND_ADDRESS").expect("APP_BIND_ADDRESS is not provided in env").as_str())?;
 

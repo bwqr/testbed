@@ -6,16 +6,16 @@ use core::websocket_messages::{BaseMessage, SocketMessage, SocketMessageKind};
 use core::websocket_messages::server::RegisterBackend;
 use core::SocketErrorKind;
 
-use crate::experiment::server::ExperimentServer;
+use crate::connection::server::ExperimentServer;
 
 pub struct Session {
-    experiment_server: Addr<ExperimentServer>
+    // experiment_server: Addr<ExperimentServer>
 }
 
 impl Session {
     pub fn new(experiment_server: Addr<ExperimentServer>) -> Self {
         Session {
-            experiment_server
+            // experiment_server
         }
     }
 

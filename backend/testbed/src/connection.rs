@@ -103,7 +103,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for Connection {
     }
 
     fn started(&mut self, _ctx: &mut Context<Self>) {
-        // After connection is established between server and experiment, register this backend
+        // After connection is established between server and testbed, register this backend
         let message = SocketMessage {
             kind: SocketMessageKind::RegisterBackend,
             data: RegisterBackend {

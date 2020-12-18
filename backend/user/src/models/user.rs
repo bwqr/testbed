@@ -16,7 +16,7 @@ use core::models::token::AuthToken;
 use core::schema::users;
 use core::types::{DBPool, ModelId};
 
-#[derive(Queryable, Identifiable, Deserialize, Serialize)]
+#[derive(Queryable, Identifiable, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     pub id: ModelId,
