@@ -43,10 +43,7 @@ pub async fn join_server(
         .await?;
 
     ws::start(Session::new(experiment_server.get_ref().clone(), runner.id), &req, stream)
-        .map_err(|e| {
-            error!("{:?}", e);
-            Box::new(ErrorMessage::UnknownError) as Box<dyn ErrorMessaging>
-        })
+        .map_err(|e| Box::new(ErrorMessage::WebSocketConnectionError) as Box<dyn ErrorMessaging>)
 }
 
 #[get("experiments")]

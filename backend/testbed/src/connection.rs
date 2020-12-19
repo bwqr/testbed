@@ -11,8 +11,8 @@ use awc::ws::{Codec, Frame, Message};
 use futures::stream::{SplitSink, StreamExt};
 use log::{error, info};
 
-use core::websocket_messages::{SocketMessage, SocketMessageKind};
-use core::websocket_messages::server::RegisterBackend;
+use core::SocketErrorKind;
+use core::websocket_messages::{client, server};
 
 use crate::executor::Executor;
 use crate::messages::UpdateExecutorMessage;
@@ -44,6 +44,46 @@ impl Connection {
             current_timing_index: 0,
             executor: None,
         }
+    }
+
+    fn handle_frame(&mut self, frame: Frame) -> Result<(), SocketErrorKind> {
+        match frame {
+            Frame::Ping(_) => {
+                //update hb
+            }
+            Frame::Pong(_) => {
+                // update hb
+            }
+            Frame::Text(bytes) => {
+                let text = String::from_utf8(bytes.to_vec())
+                    .map_err(|_| SocketErrorKind::InvalidMessage)?;
+                let text = text.as_str();
+
+                let base = serde_json::from_str::<'_, client::BaseMessage>(text)
+                    .map_err(|_| SocketErrorKind::InvalidMessage)?;
+
+                match base.kind {
+                    client::SocketMessageKind::RunExperiment => {
+                        let run_experiment = serde_json::from_str::<'_, client::SocketMessage<client::RunExperiment>>(text)
+                            .map_err(|_| SocketErrorKind::InvalidMessage)?;
+
+                        info!("received run from server, id {}", run_experiment.data.run_id);
+
+                        if let Some(sink) = &mut self.sink {
+                            sink.write(Message::Text(serde_json::to_string(&server::SocketMessage {
+                                kind: server::SocketMessageKind::RunResult,
+                                data: server::RunResult {
+                                    run_id: run_experiment.data.run_id,
+                                    successful: true,
+                                },
+                            }).unwrap()));
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        Ok(())
     }
 
     async fn connect(server_url: String, access_token: String) -> Result<Framed<BoxedSocket, Codec>, Error> {
@@ -96,24 +136,15 @@ impl Actor for Connection {
 }
 
 impl StreamHandler<Result<Frame, WsProtocolError>> for Connection {
-    fn handle(&mut self, msg: Result<Frame, WsProtocolError>, _: &mut Context<Self>) {
-        if let Ok(Frame::Text(txt)) = msg {
-            info!("Server: {:?}", txt)
-        }
-    }
-
-    fn started(&mut self, _ctx: &mut Context<Self>) {
-        // After connection is established between server and testbed, register this backend
-        let message = SocketMessage {
-            kind: SocketMessageKind::RegisterBackend,
-            data: RegisterBackend {
-                access_token: self.access_token.clone(),
-            },
+    fn handle(&mut self, frame: Result<Frame, WsProtocolError>, ctx: &mut Context<Self>) {
+        match frame {
+            Ok(frame) => {
+                if let Err(e) = self.handle_frame(frame) {
+                    error!("{:?}", e);
+                }
+            }
+            Err(e) => error!("{:?}", e)
         };
-
-        if let Some(sink) = &mut self.sink {
-            sink.write(Message::Text(serde_json::to_string(&message).unwrap()));
-        }
     }
 
     fn finished(&mut self, ctx: &mut Context<Self>) {

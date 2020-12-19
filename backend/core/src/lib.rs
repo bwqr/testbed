@@ -37,6 +37,7 @@ pub enum ErrorMessage {
     UniqueViolation,
     ItemNotFound,
     UnknownError,
+    WebSocketConnectionError,
     HashFailed,
     AskamaError,
     InvalidOperationForStatus,
@@ -104,6 +105,11 @@ impl ErrorMessaging for ErrorMessage {
                 code: StatusCode::UNPROCESSABLE_ENTITY,
                 error_code: 112,
                 message: String::from("invalid_operation_for_status"),
+            },
+            ErrorMessage::WebSocketConnectionError => HttpError {
+                code: StatusCode::BAD_REQUEST,
+                error_code: 113,
+                message: String::from("web_socket_connection_error"),
             }
         }
     }

@@ -22,7 +22,6 @@ pub struct RunExperimentMessage {
 }
 
 pub struct ExperimentServer {
-    // (run_id, session_id)
     active_runs: Vec<Run>,
     pending_runs: Vec<ModelId>,
     // run_id -> (session, run_id)
@@ -69,7 +68,8 @@ impl ExperimentServer {
                 } else {
                     // web::block(move || diesel::update(runs::table.find(run_id)).set(runs::status.eq(RunStatus::Running.value())).execute())
                 }
-            }.into_actor(act)
+            }
+                .into_actor(act)
                 .spawn(ctx)
         }
         // Otherwise push it into pending
