@@ -28,7 +28,7 @@ const TIMINGS: [u8; MAX_TIMING] = [
 
 pub struct Connection {
     server_url: String,
-    access_key: String,
+    access_token: String,
     sink: Option<Write>,
     // this is the delay until we try connecting again
     current_timing_index: usize,
@@ -36,19 +36,19 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(server_url: String, access_key: String) -> Self {
+    pub fn new(server_url: String, access_token: String) -> Self {
         Connection {
             server_url,
-            access_key,
+            access_token,
             sink: None,
             current_timing_index: 0,
             executor: None,
         }
     }
 
-    async fn connect(server_url: String) -> Result<Framed<BoxedSocket, Codec>, Error> {
+    async fn connect(server_url: String, access_token: String) -> Result<Framed<BoxedSocket, Codec>, Error> {
         Ok(Client::new()
-            .ws(server_url)
+            .ws(format!("{}?token={}", server_url, access_token))
             .connect()
             .await
             .map_err(|e| {
@@ -58,7 +58,7 @@ impl Connection {
     }
 
     fn try_connect(act: &mut Connection, ctx: &mut <Self as Actor>::Context) {
-        Self::connect(act.server_url.clone())
+        Self::connect(act.server_url.clone(), act.access_token.clone())
             .into_actor(act)
             .then(move |framed, act, ctx| {
                 if let Ok(framed) = framed {
@@ -107,7 +107,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for Connection {
         let message = SocketMessage {
             kind: SocketMessageKind::RegisterBackend,
             data: RegisterBackend {
-                access_key: self.access_key.clone(),
+                access_token: self.access_token.clone(),
             },
         };
 

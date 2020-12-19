@@ -21,6 +21,6 @@ pub mod server {
 
     #[derive(Deserialize, Serialize)]
     pub struct RegisterBackend {
-        pub access_key: String,
+        pub access_token: String,
     }
 }

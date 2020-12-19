@@ -12,7 +12,7 @@ fn main() {
     // Load .env
     dotenv::dotenv().ok();
 
-    let access_key = std::env::var("BACKEND_ACCESS_KEY").expect("BACKEND_ACCESS_KEY is not provided in env");
+    let access_token = std::env::var("BACKEND_ACCESS_TOKEN").expect("BACKEND_ACCESS_TOKEN is not provided in env");
     let server_url = std::env::var("SERVER_URL").expect("SERVER_URL is not provided in env");
 
     // Enable logger
@@ -21,7 +21,7 @@ fn main() {
     let sys = System::new("websocket-client");
 
     Arbiter::spawn(async move {
-        let connection = Connection::new(server_url, access_key).start();
+        let connection = Connection::new(server_url, access_token).start();
         let executor = Executor::new().start();
 
         connection

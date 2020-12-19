@@ -12,13 +12,17 @@ pub fn register(config: &mut web::ServiceConfig) {
     config
         .service(
             web::scope("/api/experiment")
-                .wrap(Auth)
-                .service(handlers::fetch_experiments)
-                .service(handlers::fetch_experiment)
-                .service(handlers::create_new_experiment)
-                .service(handlers::update_experiment)
-                .service(handlers::run_experiment)
-                .service(handlers::delete_experiment)
+                .service(handlers::join_server)
+                .service(
+                    web::scope("")
+                        .wrap(Auth)
+                        .service(handlers::fetch_experiments)
+                        .service(handlers::fetch_experiment)
+                        .service(handlers::create_new_experiment)
+                        .service(handlers::update_experiment)
+                        .service(handlers::run_experiment)
+                        .service(handlers::delete_experiment)
+                )
         );
 }
 

@@ -5,22 +5,48 @@ use diesel::prelude::*;
 use log::error;
 
 use core::db::DieselEnum;
+use core::error::ErrorMessaging;
 use core::ErrorMessage;
 use core::models::paginate::{CountStarOver, Paginate, PaginationRequest};
-use core::responses::SuccessResponse;
+use core::responses::{SuccessResponse, TokenResponse};
 use core::sanitized::SanitizedJson;
-use core::schema::experiments;
-use core::types::{DBPool, DefaultResponse, ModelId, Result};
+use core::schema::{experiments, runners, runs};
+use core::types::{DBPool, DefaultResponse, ModelId};
+use core::utils::Hash;
 use user::models::user::User;
 
 use crate::connection::server::{ExperimentServer, RunExperimentMessage};
 use crate::connection::session::Session;
-use crate::models::experiment::{Experiment, ExperimentStatus};
+use crate::models::experiment::Experiment;
+use crate::models::run::{Run, RunStatus};
+use crate::models::runner::{Runner, RunnerToken};
 use crate::requests::ExperimentRequest;
 
-#[get("/ws")]
-pub async fn join_server(experiment_server: web::Data<Addr<ExperimentServer>>, req: HttpRequest, stream: web::Payload) -> actix_web::Result<HttpResponse> {
-    ws::start(Session::new(experiment_server.get_ref().clone()), &req, stream)
+#[get("ws")]
+pub async fn join_server(
+    pool: web::Data<DBPool>,
+    hash: web::Data<Hash>,
+    experiment_server: web::Data<Addr<ExperimentServer>>,
+    req: HttpRequest,
+    stream: web::Payload,
+    token: web::Query<TokenResponse>,
+) -> DefaultResponse {
+    let conn = pool.get().unwrap();
+
+    let token = hash.decode::<RunnerToken>(token.token.as_str())
+        .map_err(|_| ErrorMessage::InvalidToken)?;
+
+    let runner = web::block(move || runners::table
+        .filter(runners::access_key.eq(token.access_key))
+        .first::<Runner>(&conn)
+    )
+        .await?;
+
+    ws::start(Session::new(experiment_server.get_ref().clone(), runner.id), &req, stream)
+        .map_err(|e| {
+            error!("{:?}", e);
+            Box::new(ErrorMessage::UnknownError) as Box<dyn ErrorMessaging>
+        })
 }
 
 #[get("experiments")]
@@ -90,36 +116,29 @@ pub async fn update_experiment(pool: web::Data<DBPool>, experiment_id: web::Path
     Ok(HttpResponse::Ok().json(SuccessResponse::default()))
 }
 
-#[put("run/{id}")]
+#[put("experiment/{id}/run")]
 pub async fn run_experiment(pool: web::Data<DBPool>, experiment_server: web::Data<Addr<ExperimentServer>>, experiment_id: web::Path<ModelId>, user: User)
                             -> DefaultResponse {
     let conn = pool.get().unwrap();
 
-    let experiment = web::block(move || -> Result<Experiment> {
-        // We may need to do this in transaction. However concurrent updating is not a problem for this specific endpoint
+    let run = web::block(move || {
         let experiment = experiments::table
             .filter(experiments::user_id.eq(user.id))
             .find(experiment_id.into_inner())
             .first::<Experiment>(&conn)?;
 
-        if experiment.status == ExperimentStatus::Pending || experiment.status == ExperimentStatus::Running {
-            return Err(Box::new(ErrorMessage::InvalidOperationForStatus));
-        } else {
-            diesel::update(experiments::table.find(experiment.id))
-                .set(experiments::status.eq(ExperimentStatus::Pending.value()))
-                .execute(&conn)?;
-        }
-
-        Ok(experiment)
+        diesel::insert_into(runs::table)
+            .values(runs::experiment_id.eq(experiment.id))
+            .get_result::<Run>(&conn)
     })
         .await?;
 
-    if let Err(e) = experiment_server.send(RunExperimentMessage { experiment_id: experiment.id })
+    if let Err(e) = experiment_server.send(RunExperimentMessage { run_id: run.id })
         .await {
-        error!("Error while sending experiment to ExperimentServer: {:?}", e);
+        error!("Error while sending run to ExperimentServer: {:?}", e);
 
-        web::block(move || diesel::update(experiments::table.find(experiment.id))
-            .set(experiments::status.eq(ExperimentStatus::Failed.value()))
+        web::block(move || diesel::update(runs::table.find(run.id))
+            .set(runs::status.eq(RunStatus::Failed.value()))
             .execute(&pool.get().unwrap())
         )
             .await?;
