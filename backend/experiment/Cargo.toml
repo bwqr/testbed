@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 core = { path = "../core" }
+shared = { path = "../shared" }
 user = { path = "../user" }
 derive = { path = "../derive" }
 

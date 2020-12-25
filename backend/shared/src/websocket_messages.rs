@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::ModelId;
+type ModelId = i32;
 
 pub mod server {
     use super::{Deserialize, ModelId, Serialize};
@@ -23,7 +23,7 @@ pub mod server {
 
     #[derive(Deserialize, Serialize)]
     pub struct RunResult {
-        pub run_id: ModelId,
+        pub job_id: ModelId,
         pub successful: bool,
     }
 }
@@ -49,6 +49,7 @@ pub mod client {
 
     #[derive(Deserialize, Serialize)]
     pub struct RunExperiment {
-        pub run_id: ModelId
+        pub job_id: ModelId,
+        pub code: String,
     }
 }

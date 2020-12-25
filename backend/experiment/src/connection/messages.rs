@@ -7,7 +7,8 @@ use crate::connection::session::Session;
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct RunMessage {
-    pub run_id: ModelId
+    pub job_id: ModelId,
+    pub code: String,
 }
 
 #[derive(Message)]
@@ -21,6 +22,6 @@ pub struct JoinServerMessage {
 #[rtype(result = "()")]
 pub struct RunResultMessage {
     pub runner_id: ModelId,
-    pub run_id: ModelId,
+    pub job_id: ModelId,
     pub successful: bool,
 }

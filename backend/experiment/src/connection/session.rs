@@ -2,9 +2,9 @@ use actix::prelude::*;
 use actix_web_actors::ws::{Message, ProtocolError, WebsocketContext};
 use log::{error, info};
 
-use core::SocketErrorKind;
 use core::types::ModelId;
-use core::websocket_messages::{client, server};
+use shared::SocketErrorKind;
+use shared::websocket_messages::{client, server};
 
 use crate::connection::messages::{JoinServerMessage, RunMessage, RunResultMessage};
 use crate::connection::server::ExperimentServer;
@@ -24,10 +24,7 @@ impl Session {
 
     fn handle_msg(&self, msg: Message, ctx: &mut WebsocketContext<Self>) -> Result<(), SocketErrorKind> {
         match msg {
-            Message::Ping(_) => {
-                // self.hb = Instant::now()
-            }
-            Message::Pong(_) => {
+            Message::Ping(_) | Message::Pong(_) => {
                 // self.hb = Instant::now()
             }
             Message::Text(text) => {
@@ -44,15 +41,18 @@ impl Session {
                         info!("received run result from runner, successful {}", run_result.data.successful);
 
                         let exp_addr = self.experiment_server.clone();
-                        let runner_id = self.runner_id;
+
+                        let msg = RunResultMessage {
+                            job_id: run_result.data.job_id,
+                            runner_id: self.runner_id,
+                            successful: run_result.data.successful,
+                        };
 
                         async move {
-                            exp_addr.send(RunResultMessage {
-                                run_id: run_result.data.run_id,
-                                runner_id,
-                                successful: run_result.data.successful,
-                            })
-                                .await;
+                            if let Err(e) = exp_addr.send(msg)
+                                .await {
+                                error!("Sending message to experiment server is failed: {:?}", e);
+                            }
                         }
                             .into_actor(self)
                             .spawn(ctx);
@@ -71,16 +71,18 @@ impl Actor for Session {
     type Context = WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        let runner_id = self.runner_id;
-        let session_addr = ctx.address();
         let exp_addr = self.experiment_server.clone();
 
+        let msg = JoinServerMessage {
+            runner_id: self.runner_id,
+            addr: ctx.address(),
+        };
+
         async move {
-            exp_addr.send(JoinServerMessage {
-                runner_id,
-                addr: session_addr,
-            })
-                .await;
+            if let Err(e) = exp_addr.send(msg)
+                .await {
+                error!("joining into server is failed: {:?}", e);
+            }
         }
             .into_actor(self)
             .spawn(ctx);
@@ -91,17 +93,14 @@ impl Actor for Session {
 
 impl StreamHandler<Result<Message, ProtocolError>> for Session {
     fn handle(&mut self, msg: Result<Message, ProtocolError>, ctx: &mut Self::Context) {
-        let msg = match msg {
-            Ok(m) => m,
-            Err(_) => {
-                ctx.stop();
-                return;
+        match msg {
+            Ok(msg) => {
+                if let Err(e) = self.handle_msg(msg, ctx) {
+                    error!("{:?}", e);
+                }
             }
+            Err(_) => ctx.stop()
         };
-
-        if let Err(e) = self.handle_msg(msg, ctx) {
-            error!("{:?}", e);
-        }
     }
 }
 
@@ -109,27 +108,12 @@ impl Handler<RunMessage> for Session {
     type Result = ();
 
     fn handle(&mut self, msg: RunMessage, ctx: &mut Self::Context) {
-        info!("got run message {}", msg.run_id);
+        info!("got run message {}", msg.job_id);
 
+        // TODO we can send directly message to client, instead of copying msg into RunExperiment
         ctx.text(serde_json::to_string(&client::SocketMessage {
             kind: client::SocketMessageKind::RunExperiment,
-            data: client::RunExperiment { run_id: msg.run_id },
+            data: client::RunExperiment { job_id: msg.job_id, code: msg.code },
         }).unwrap());
-
-        // ctx.run_later(Duration::from_secs(60), |act, ctx| {
-        //     let runner_id = act.runner_id;
-        //     let exp_addr = act.experiment_server.clone();
-        //
-        //     async move {
-        //         exp_addr.send(RunResultMessage {
-        //             run_id: msg.run_id,
-        //             runner_id,
-        //             successful: false,
-        //         })
-        //             .await;
-        //     }
-        //         .into_actor(act)
-        //         .spawn(ctx);
-        // });
     }
 }

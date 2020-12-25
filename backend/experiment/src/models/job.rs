@@ -5,33 +5,36 @@ use diesel::sql_types::VarChar;
 use serde::{Deserialize, Serialize};
 
 use core::db::DieselEnum;
-use core::schema::runs;
+use core::schema::jobs;
 use core::types::ModelId;
 
 #[derive(Identifiable, Queryable, Serialize)]
-pub struct Run {
+pub struct Job {
     pub id: ModelId,
     pub experiment_id: ModelId,
-    pub status: RunStatus,
+    pub runner_id: ModelId,
+    pub code: String,
+    pub status: JobStatus,
     pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
-pub enum RunStatus {
+pub enum JobStatus {
     Pending,
     Running,
     Successful,
     Failed,
 }
 
-impl Default for RunStatus {
+impl Default for JobStatus {
     fn default() -> Self {
-        RunStatus::Pending
+        JobStatus::Pending
     }
 }
 
-impl Queryable<VarChar, Pg> for RunStatus {
+impl Queryable<VarChar, Pg> for JobStatus {
     type Row = String;
 
     fn build(row: Self::Row) -> Self {

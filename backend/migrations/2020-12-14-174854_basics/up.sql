@@ -30,18 +30,10 @@ create table experiments
     id         serial PRIMARY KEY NOT NULL,
     user_id    integer            NOT NULL,
     name       varchar(255)       NOT NULL,
+    code       text               NOT NULL DEFAULT '',
     created_at timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT experiment_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION
-);
-
-create table runs
-(
-    id            serial PRIMARY KEY NOT NULL,
-    experiment_id integer            NOT NULL,
-    status        varchar(11)        NOT NULL DEFAULT 'Pending' CHECK ( status in ('Pending', 'Running', 'Successful', 'Failed') ),
-    created_at    timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT run_experiment_id FOREIGN KEY (experiment_id) REFERENCES experiments (id) ON DELETE CASCADE ON UPDATE NO ACTION
 );
 
 create table runners
@@ -49,6 +41,19 @@ create table runners
     id         serial PRIMARY KEY  NOT NULL,
     access_key varchar(191) UNIQUE NOT NULL,
     created_at timestamp           NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+create table jobs
+(
+    id            serial PRIMARY KEY NOT NULL,
+    experiment_id integer            NOT NULL,
+    runner_id     integer            NOT NULL,
+    code          text               NOT NULL,
+    status        varchar(11)        NOT NULL DEFAULT 'Pending' CHECK ( status in ('Pending', 'Running', 'Successful', 'Failed') ),
+    created_at    timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT job_experiment_id FOREIGN KEY (experiment_id) REFERENCES experiments (id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    CONSTRAINT job_runner_id FOREIGN KEY (runner_id) REFERENCES runners (id) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 insert into runners (access_key)

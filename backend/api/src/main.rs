@@ -57,6 +57,18 @@ fn setup_services() -> ClientServices {
     }
 }
 
+fn setup_experiment_server(pool: DBPool) -> Addr<ExperimentServer> {
+    let (tx, rx) = channel::<Addr<ExperimentServer>>();
+    std::thread::Builder::new().name("experiment_server".to_string()).spawn(move || {
+        let sys = System::new("experiment_server");
+        let experiment_server = ExperimentServer::new(pool).start();
+        tx.send(experiment_server).expect("Failed to send ExperimentServer from thread");
+        sys.run()
+    }).expect("Failed to initialize thread");
+
+    rx.recv().expect("Failed to receive ExperimentServer from thread")
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // Load .env
@@ -74,7 +86,7 @@ async fn main() -> std::io::Result<()> {
     // Create utils
     let hash = Hash::new(&*SECRET_KEY, Algorithm::HS256);
 
-    let experiment_server = ExperimentServer::new().start();
+    let experiment_server = setup_experiment_server(pool.clone());
 
     let config = Arc::new(Config {
         web_app_url: std::env::var("WEB_APP_URL").expect("WEB_APP_URL is not provided in env"),

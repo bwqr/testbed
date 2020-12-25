@@ -7,6 +7,7 @@ use std::fmt::Debug;
 
 use actix_web::http::StatusCode;
 pub use htmlescape::encode_minimal;
+pub use htmlescape::decode_html;
 
 use crate::error::{ErrorMessaging, HttpError};
 
@@ -19,12 +20,7 @@ pub mod sanitized;
 pub mod schema;
 pub mod types;
 pub mod utils;
-pub mod websocket_messages;
 
-#[derive(Debug)]
-pub enum SocketErrorKind {
-    InvalidMessage,
-}
 
 #[derive(Debug)]
 pub enum ErrorMessage {
