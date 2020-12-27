@@ -1,113 +1,99 @@
 use std::io::Write;
-use std::thread;
 
 use actix::prelude::*;
 use log::{error, info};
 
 use crate::connection::Connection;
-use crate::messages::{RunMessage, UpdateConnectionMessage};
-
-pub struct ExecutorMock {
-    connection: Option<Addr<Connection>>
-}
-
-impl ExecutorMock {
-    pub fn new() -> Self {
-        ExecutorMock {
-            connection: None
-        }
-    }
-}
-
-impl Actor for ExecutorMock {
-    type Context = Context<Self>;
-}
-
-impl Handler<UpdateConnectionMessage> for ExecutorMock {
-    type Result = ();
-
-    fn handle(&mut self, msg: UpdateConnectionMessage, _: &mut Self::Context) {
-        self.connection = Some(msg.connection);
-    }
-}
-
-impl Handler<RunMessage> for ExecutorMock {
-    type Result = ();
-
-    fn handle(&mut self, msg: RunMessage, _: &mut Self::Context) {
-        info!("got some run for ExecutorMock, id: {}, code: {}", msg.job_id, msg.code);
-
-        std::fs::create_dir_all("/tmp/testbed").unwrap();
-
-        let mut f = std::fs::File::create(format!("/tmp/testbed/job_{}.py", msg.job_id)).unwrap();
-
-        f.write(msg.code.as_bytes()).unwrap();
-
-        match std::process::Command::new("/usr/bin/docker")
-            .arg("run")
-            .arg("--rm")
-            .args(&["--volume", "/tmp/testbed/:/usr/local/scripts/"])
-            .arg("python:rc-alpine")
-            .args(&["python", format!("/usr/local/scripts/job_{}.py", msg.job_id).as_str()])
-            .arg(msg.code)
-            .output() {
-            Ok(output) => info!(
-                "successful execution, status {:?}, stdout {:?}, stderr {:?}",
-                output.status,
-                String::from_utf8(output.stdout),
-                String::from_utf8(output.stderr)
-            ),
-            Err(e) => error!("failed to execute, {}", e)
-        };
-
-        // std::fs::remove_file(format!("/tmp/testbed/job_{}.py", msg.job_id)).unwrap();
-    }
-}
+use crate::messages::{RunMessage, RunResultMessage};
+use crate::ModelId;
 
 pub struct Executor {
-    connection: Option<Addr<Connection>>
+    connection: Addr<Connection>
 }
 
 impl Executor {
-    pub fn new() -> Self {
+    pub fn new(connection: Addr<Connection>) -> Self {
         Executor {
-            connection: None
+            connection
         }
+    }
+
+    fn handle_execution(job_id: ModelId, code: String) -> Result<String, Error> {
+        let dir = format!("/tmp/testbed/{}", job_id);
+        let file = dir.clone() + "/job.py";
+
+        std::fs::create_dir_all(dir.as_str())
+            .map_err(|e| Error::IO(e))?;
+
+        let mut f = std::fs::File::create(file.as_str())
+            .map_err(|e| Error::IO(e))?;
+
+        f.write(code.as_bytes())
+            .map_err(|e| Error::IO(e))?;
+
+        let output = std::process::Command::new("/usr/bin/docker")
+            .arg("run")
+            .arg("--rm")
+            .args(&["--volume", (dir.clone() + ":/usr/local/scripts/").as_str()])
+            .arg("python:rc-alpine")
+            .args(&["python", "/usr/local/scripts/job.py"])
+            .output()
+            .map_err(|e| Error::IO(e))?;
+
+        if output.stderr.len() > 0 {
+            return Err(Error::Output(String::from_utf8(output.stderr).map_err(|e| Error::String(e))?));
+        }
+
+        info!(
+            "successful execution, status {:?}, stdout {:?}, stderr {:?}",
+            output.status, String::from_utf8(output.stdout.clone()).map_err(|e| Error::String(e))?,
+            String::from_utf8(output.stderr).map_err(|e| Error::String(e))?);
+
+        std::fs::remove_dir_all(dir.as_str())
+            .map_err(|e| Error::IO(e))?;
+
+        Ok(String::from_utf8(output.stdout)
+            .map_err(|e| Error::String(e))?)
     }
 }
 
 impl Actor for Executor {
     type Context = Context<Self>;
-
-    fn started(&mut self, _: &mut Self::Context) {}
-
-    fn stopped(&mut self, _: &mut Self::Context) {}
-}
-
-impl Handler<UpdateConnectionMessage> for Executor {
-    type Result = ();
-
-    fn handle(&mut self, msg: UpdateConnectionMessage, _: &mut Self::Context) {
-        self.connection = Some(msg.connection);
-    }
 }
 
 impl Handler<RunMessage> for Executor {
     type Result = ();
 
-    fn handle(&mut self, msg: RunMessage, _: &mut Self::Context) {
-        info!("got some run for Executor {}", msg.job_id);
+    fn handle(&mut self, msg: RunMessage, ctx: &mut Self::Context) {
+        info!("got some run for ExecutorMock, id: {}, code: {}", msg.job_id, msg.code);
 
-        let gpio = sysfs_gpio::Pin::new(18);
+        let job_id = msg.job_id;
 
-        gpio.with_exported(|| {
-            gpio.set_direction(sysfs_gpio::Direction::Out)?;
-            gpio.set_value(1)?;
-            thread::sleep(std::time::Duration::from_secs(5));
-            gpio.set_value(1)?;
+        let addr = self.connection.clone();
 
-            Ok(())
-        })
-            .map_err(|e| error!("Some error occurred {:?}", e));
+        let (output, successful) = match Self::handle_execution(msg.job_id, msg.code) {
+            Ok(output) => (output, true),
+            Err(e) => {
+                error!("could not execute the job, {:?}", e);
+
+                (format!("{:?}", e), false)
+            }
+        };
+
+        async move {
+            if let Err(e) = addr.send(RunResultMessage { job_id, output, successful })
+                .await {
+                error!("could not send run result to connection, {:?}", e);
+            }
+        }
+            .into_actor(self)
+            .spawn(ctx);
     }
+}
+
+#[derive(Debug)]
+pub enum Error {
+    IO(std::io::Error),
+    String(std::string::FromUtf8Error),
+    Output(String),
 }

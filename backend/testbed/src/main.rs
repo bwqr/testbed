@@ -1,14 +1,29 @@
-use actix::{Actor, Arbiter, System};
+use std::sync::mpsc::channel;
+
+use actix::{Actor, Addr, Arbiter, Recipient, System};
 
 use crate::connection::Connection;
-use crate::executor::{Executor, ExecutorMock};
-use crate::messages::{RunMessage, UpdateConnectionMessage, UpdateExecutorMessage};
+use crate::executor::Executor;
+use crate::messages::{RunMessage, UpdateExecutorMessage};
 
 mod connection;
 mod executor;
 mod messages;
 
 type ModelId = i32;
+
+fn setup_executor(connection: Addr<Connection>) -> Recipient<RunMessage> {
+    let (tx, rx) = channel::<Recipient<RunMessage>>();
+
+    std::thread::Builder::new().name("executor".to_string()).spawn(move || {
+        let sys = System::new("executor");
+        let executor = Executor::new(connection).start();
+        tx.send(executor.recipient::<RunMessage>()).expect("Failed to send Executor from thread");
+        sys.run()
+    }).expect("Failed to initialize thread");
+
+    rx.recv().expect("Failed to receive Executor from thread")
+}
 
 fn main() {
     // Load .env
@@ -25,19 +40,10 @@ fn main() {
     Arbiter::spawn(async move {
         let connection = Connection::new(server_url, access_token).start();
 
-        // TODO move executor into another thread. It should not block connection
-        #[cfg(target_arch = "x86_64")]
-            let executor = ExecutorMock::new().start();
-        #[cfg(target_arch = "arm")]
-            let executor = Executor::new().start();
-
-        executor
-            .send(UpdateConnectionMessage { connection: connection.clone() })
-            .await
-            .unwrap();
+        let executor = setup_executor(connection.clone());
 
         connection
-            .send(UpdateExecutorMessage { executor: executor.recipient::<RunMessage>() })
+            .send(UpdateExecutorMessage { executor })
             .await
             .unwrap();
     });

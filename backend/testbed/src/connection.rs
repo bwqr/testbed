@@ -14,8 +14,7 @@ use log::{error, info};
 use shared::SocketErrorKind;
 use shared::websocket_messages::{client, server};
 
-use crate::executor::Executor;
-use crate::messages::{RunMessage, UpdateExecutorMessage};
+use crate::messages::{RunMessage, RunResultMessage, UpdateExecutorMessage};
 
 type Write = SinkWrite<Message, SplitSink<Framed<BoxedSocket, Codec>, Message>>;
 
@@ -82,16 +81,6 @@ impl Connection {
                             }
                                 .into_actor(self)
                                 .spawn(ctx);
-                        }
-
-                        if let Some(sink) = &mut self.sink {
-                            sink.write(Message::Text(serde_json::to_string(&server::SocketMessage {
-                                kind: server::SocketMessageKind::RunResult,
-                                data: server::RunResult {
-                                    job_id: run_experiment.data.job_id,
-                                    successful: true,
-                                },
-                            }).unwrap()));
                         }
                     }
                 }
@@ -176,6 +165,23 @@ impl Handler<UpdateExecutorMessage> for Connection {
 
     fn handle(&mut self, msg: UpdateExecutorMessage, _: &mut Self::Context) {
         self.executor = Some(msg.executor);
+    }
+}
+
+impl Handler<RunResultMessage> for Connection {
+    type Result = ();
+
+    fn handle(&mut self, msg: RunResultMessage, _: &mut Self::Context) {
+        if let Some(sink) = &mut self.sink {
+            sink.write(Message::Text(serde_json::to_string(&server::SocketMessage {
+                kind: server::SocketMessageKind::RunResult,
+                data: server::RunResult {
+                    job_id: msg.job_id,
+                    output: msg.output,
+                    successful: msg.successful,
+                },
+            }).unwrap()));
+        }
     }
 }
 
