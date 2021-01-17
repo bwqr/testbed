@@ -1,10 +1,11 @@
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, errors::Error as JWTErrors, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, errors::Error as JWTErrors, Header, Validation};
 pub use jsonwebtoken::errors::ErrorKind as JWTErrorKind;
 use ring::hmac;
 use serde::{de::DeserializeOwned, Serialize};
+pub use jsonwebtoken::Algorithm;
 
 #[derive(Clone)]
-pub struct Hash{
+pub struct Hash {
     encoding_key: EncodingKey,
     decoding_key: DecodingKey<'static>,
     hmac256_key: hmac::Key,
