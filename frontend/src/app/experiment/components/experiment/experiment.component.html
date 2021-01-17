@@ -1,7 +1,17 @@
 <div class="container mt-4">
-  <div *ngIf="isPageReady">
-    {{experiment.code}}
+  <div class="mb-5">
+    <h2 class="title">Experiment</h2>
+    <hr>
   </div>
 
-  <div #code></div>
+  <div>
+    <div class="mb-4" *ngIf="isPageReady">
+      <div class="d-flex justify-content-end">
+        <button class="nes-btn is-primary" routerLink="../add">Save Experiment</button>
+      </div>
+      {{experiment.name}}
+    </div>
+    <hr>
+    <div #code>Loading your code</div>
+  </div>
 </div>

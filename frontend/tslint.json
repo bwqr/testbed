@@ -45,7 +45,7 @@
     ],
     "no-console": [
       true,
-      "debug",1
+      "debug",
       "info",
       "time",
       "timeEnd",
