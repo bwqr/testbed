@@ -42,7 +42,7 @@ impl Executor {
             .output()
             .map_err(|e| Error::IO(e))?;
 
-        if output.stderr.len() > 0 {
+        if !output.status.success() {
             return Err(Error::Output(String::from_utf8(output.stderr).map_err(|e| Error::String(e))?));
         }
 
