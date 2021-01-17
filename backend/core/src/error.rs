@@ -5,7 +5,6 @@ use actix_web::{HttpResponse, ResponseError};
 use actix_web::http::StatusCode;
 use actix_web::rt::blocking::BlockingError;
 use diesel::result::{DatabaseErrorKind, Error};
-pub use jsonwebtoken::Algorithm;
 use jsonwebtoken::errors::Error as JWTErrors;
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use validator::ValidationErrors;
@@ -150,17 +149,13 @@ impl ErrorMessaging for BlockingError<Box<dyn ErrorMessaging>> {
 
 impl ErrorMessaging for Error {
     fn value(&self) -> HttpError {
-        diesel_error_into_messaging(self).value()
-    }
-}
-
-fn diesel_error_into_messaging(e: &Error) -> ErrorMessage {
-    match e {
-        Error::DatabaseError(kind, _) => match kind {
-            DatabaseErrorKind::UniqueViolation => ErrorMessage::UniqueViolation,
-            _ => ErrorMessage::DBError
-        },
-        Error::NotFound => ErrorMessage::ItemNotFound,
-        _ => ErrorMessage::UnknownError
+        match self {
+            Error::DatabaseError(kind, _) => match kind {
+                DatabaseErrorKind::UniqueViolation => ErrorMessage::UniqueViolation,
+                _ => ErrorMessage::DBError
+            },
+            Error::NotFound => ErrorMessage::ItemNotFound,
+            _ => ErrorMessage::UnknownError
+        }.value()
     }
 }

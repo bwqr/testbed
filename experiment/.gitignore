@@ -1,4 +1,5 @@
-/target
 /.idea
-
-.env
+/bin
+/include
+/lib
+/lib64

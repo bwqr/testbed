@@ -8,10 +8,9 @@ use actix::prelude::*;
 use actix_cors::Cors;
 use actix_web::{App, http::header, HttpServer, middleware};
 use diesel::{PgConnection, r2d2};
-use diesel::r2d2::ConnectionManager;
 
 use core::Config;
-use core::error::Algorithm;
+use core::utils::Algorithm;
 use core::types::DBPool;
 use core::utils::Hash;
 use experiment::ExperimentServer;
@@ -23,7 +22,7 @@ lazy_static! {
 
 fn setup_database() -> DBPool {
     let conn_info = std::env::var("DATABASE_URL").expect("DATABASE_URL is not provided in env");
-    let manager = ConnectionManager::<PgConnection>::new(conn_info);
+    let manager = r2d2::ConnectionManager::<PgConnection>::new(conn_info);
     let pool = r2d2::Pool::builder().build(manager).expect("Failed to create pool.");
 
     pool
