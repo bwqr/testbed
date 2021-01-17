@@ -29,12 +29,12 @@ export class MainRequestService {
     });
   }
 
-  makeGetRequest(url: string, id?: string): Observable<any> {
+  makeGetRequest(url: string): Observable<any> {
     return this.http
       .get(url);
   }
 
-  makePostRequest(url: string, data: any, id?: string): Observable<any> {
+  makePostRequest(url: string, data: any): Observable<any> {
     // Trim strings
     MainRequestService.trimProps(data);
 
@@ -42,14 +42,14 @@ export class MainRequestService {
       .post(url, JSON.stringify(data));
   }
 
-  makePutRequest(url: string, data: any, id?: string): Observable<any> {
+  makePutRequest(url: string, data: any): Observable<any> {
     MainRequestService.trimProps(data);
 
     return this.http
       .put(url, JSON.stringify(data));
   }
 
-  makeDeleteRequest(url: string, id: string): Observable<any> {
+  makeDeleteRequest(url: string): Observable<any> {
     return this.http
       .delete(url);
   }

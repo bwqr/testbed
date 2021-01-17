@@ -1,7 +1,24 @@
-<div>
-  <form [formGroup]="formGroup" (ngSubmit)="updatePassword(formGroup.value)">
-    <input type="password" formControlName="password" appFormValidity>
-    <input type="password" formControlName="passwordConfirm" appFormValidity>
-    <button type="submit" [disabled]="!formGroup.valid || isInProcessingState">Update Password</button>
-  </form>
+<div class="container mt-4">
+  <div class="mb-4">
+    <h2 class="title">Reset Password</h2>
+    <hr>
+  </div>
+  <div class="row">
+    <div class="col-md-4">
+      <form [formGroup]="formGroup" (ngSubmit)="updatePassword(formGroup.value)">
+        <div class="nes-field mb-4">
+          <label for="password">New password</label>
+          <input id="password" class="nes-input" type="password" formControlName="password" placeholder="New password" appFormValidity>
+        </div>
+        <div class="nes-field mb-4">
+          <label for="password-confirm">Password confirm</label>
+          <input id="password-confirm" class="nes-input" type="password" formControlName="passwordConfirm" placeholder="Password confirm" appFormValidity>
+        </div>
+
+        <div class="nes-field">
+          <button class="nes-btn is-primary w-100" type="submit" [disabled]="!formGroup.valid || isInProcessingState">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>

@@ -6,6 +6,7 @@ use core::schema::experiments;
 use core::types::ModelId;
 
 #[derive(Identifiable, Queryable, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Experiment {
     pub id: ModelId,
     pub user_id: ModelId,
@@ -16,6 +17,7 @@ pub struct Experiment {
 }
 
 #[derive(Queryable, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SlimExperiment {
     pub id: ModelId,
     pub user_id: ModelId,

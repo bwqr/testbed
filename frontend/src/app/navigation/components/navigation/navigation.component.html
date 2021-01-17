@@ -1,0 +1,26 @@
+<div>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <a class="navbar-brand" href="#">nrg-testbed</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"
+            (click)="toggleNavbar('navbar-nav')">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbar-nav">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/user/profile">Profile</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/experiment/experiments">Experiments</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/user/settings">Settings</a>
+        </li>
+      </ul>
+      <a class="nav-link" routerLink="/auth/logout">Logout</a>
+    </div>
+  </nav>
+  <router-outlet></router-outlet>
+</div>

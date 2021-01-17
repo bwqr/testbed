@@ -1,0 +1,35 @@
+<div class="container mt-4">
+  <div class="mb-4">
+    <h2 class="title">Experiments</h2>
+    <hr>
+  </div>
+  <div class="d-flex justify-content-end mb-4">
+    <a class="nes-btn is-primary" routerLink="../add">Create Experiment</a>
+  </div>
+  <div class="nes-table-responsive d-flex justify-content-center align-items-center">
+    <table class="nes-table is-bordered" *ngIf="experiments">
+      <thead>
+      <tr>
+        <th>Id</th>
+        <th>Name</th>
+        <th>Created at</th>
+        <th>Last update at</th>
+        <th></th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr *ngFor="let experiment of experiments.items">
+        <td><small>{{experiment.id}}</small></td>
+        <td><small>{{experiment.name}}</small></td>
+        <td><small>{{experiment.createdAt}}</small></td>
+        <td><small>{{experiment.updatedAt}}</small></td>
+        <td>
+          <a class="nes-btn is-primary" [routerLink]="['../experiment', experiment.id]">
+            <small>Details</small>
+          </a>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

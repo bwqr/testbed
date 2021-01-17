@@ -17,7 +17,8 @@ fn setup_executor(connection: Addr<Connection>) -> Recipient<RunMessage> {
 
     std::thread::Builder::new().name("executor".to_string()).spawn(move || {
         let sys = System::new("executor");
-        let executor = Executor::new(connection).start();
+        let docker_path = std::env::var("DOCKER_PATH").expect("DOCKER_PATH is not provided in env");
+        let executor = Executor::new(connection, docker_path).start();
         tx.send(executor.recipient::<RunMessage>()).expect("Failed to send Executor from thread");
         sys.run()
     }).expect("Failed to initialize thread");

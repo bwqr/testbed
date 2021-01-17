@@ -79,11 +79,11 @@ impl<T> QueryFragment<Pg> for Paginated<T>
     fn walk_ast(&self, mut out: AstPass<Pg>) -> QueryResult<()> {
         self.query.walk_ast(out.reborrow())?;
         out.push_sql(" LIMIT ");
+        out.push_bind_param::<BigInt, _>(&self.per_page)?;
+        out.push_sql(" OFFSET ");
         let offset = (self.page - 1) * self.per_page;
         out.push_bind_param::<BigInt, _>(&offset)?;
 
-        out.push_sql(", ");
-        out.push_bind_param::<BigInt, _>(&self.per_page)?;
         Ok(())
     }
 }

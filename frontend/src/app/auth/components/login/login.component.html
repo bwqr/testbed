@@ -1,8 +1,33 @@
 <div>
+  <div class="mb-4">
+    <h1 class="title">Login</h1>
+  </div>
+
   <app-error-message [errorMessage]="errorMessage" *ngIf="errorMessage"></app-error-message>
+
   <form [formGroup]="formGroup" (ngSubmit)="login(formGroup.value)">
-    <input type="email" formControlName="email" placeholder="Email" appFormValidity>
-    <input type="password" formControlName="password" placeholder="Password" appFormValidity>
-    <button type="submit" [disabled]="!formGroup.valid || isInProcessingState">Login</button>
+    <div class="nes-field mb-4">
+      <label for="email">Email</label>
+      <input id="email" class="nes-input" type="email" formControlName="email" placeholder="Email" appFormValidity>
+    </div>
+    <div class="nes-field mb-4">
+      <label for="password">Password</label>
+      <input id="password" class="nes-input" type="password" formControlName="password" placeholder="Password"
+             appFormValidity>
+    </div>
+
+    <div class="nes-field mb-3">
+      <small>Don't have an account? <a routerLink="/auth/sign-up">Sign up</a>.</small>
+    </div>
+
+    <div class="nes-field mb-3">
+      <small>Don't remember password? <a routerLink="/auth/forgot-password">Reset your password</a>.</small>
+    </div>
+
+    <div class="nes-field">
+      <button class="nes-btn is-primary w-100" type="submit"
+              [disabled]="!formGroup.valid || isInProcessingState">Login
+      </button>
+    </div>
   </form>
 </div>

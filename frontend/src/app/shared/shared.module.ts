@@ -5,6 +5,7 @@ import {ReactiveFormsModule} from '@angular/forms';
 import {HttpClientModule} from '@angular/common/http';
 import {ErrorMessageComponent} from './components/error-message/error-message.component';
 import {FormValidityDirective} from './directives/form-validity.directive';
+import {RouterModule} from '@angular/router';
 
 
 @NgModule({
@@ -21,6 +22,7 @@ import {FormValidityDirective} from './directives/form-validity.directive';
     HttpClientModule,
     ErrorMessageComponent,
     FormValidityDirective,
+    RouterModule
   ]
 })
 export class SharedModule {

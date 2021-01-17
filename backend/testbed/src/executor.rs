@@ -8,17 +8,19 @@ use crate::messages::{RunMessage, RunResultMessage};
 use crate::ModelId;
 
 pub struct Executor {
-    connection: Addr<Connection>
+    connection: Addr<Connection>,
+    docker_path: String
 }
 
 impl Executor {
-    pub fn new(connection: Addr<Connection>) -> Self {
+    pub fn new(connection: Addr<Connection>, docker_path: String) -> Self {
         Executor {
-            connection
+            connection,
+            docker_path
         }
     }
 
-    fn handle_execution(job_id: ModelId, code: String) -> Result<String, Error> {
+    fn handle_execution(&self, job_id: ModelId, code: String) -> Result<String, Error> {
         let dir = format!("/tmp/testbed/{}", job_id);
         let file = dir.clone() + "/job.py";
 
@@ -31,7 +33,7 @@ impl Executor {
         f.write(code.as_bytes())
             .map_err(|e| Error::IO(e))?;
 
-        let output = std::process::Command::new("/usr/bin/docker")
+        let output = std::process::Command::new(self.docker_path.as_str())
             .arg("run")
             .arg("--rm")
             .args(&["--volume", (dir.clone() + ":/usr/local/scripts/").as_str()])
@@ -65,13 +67,13 @@ impl Handler<RunMessage> for Executor {
     type Result = ();
 
     fn handle(&mut self, msg: RunMessage, ctx: &mut Self::Context) {
-        info!("got some run for ExecutorMock, id: {}, code: {}", msg.job_id, msg.code);
+        info!("got some run for Executor, id: {}, code: {}", msg.job_id, msg.code);
 
         let job_id = msg.job_id;
 
         let addr = self.connection.clone();
 
-        let (output, successful) = match Self::handle_execution(msg.job_id, msg.code) {
+        let (output, successful) = match self.handle_execution(msg.job_id, msg.code) {
             Ok(output) => (output, true),
             Err(e) => {
                 error!("could not execute the job, {:?}", e);
