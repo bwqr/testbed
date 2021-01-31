@@ -24,7 +24,7 @@ export interface SlimJob {
 
 export interface Job extends SlimJob {
   code: string;
-  output: string;
+  output?: string;
 }
 
 export enum JobStatus {

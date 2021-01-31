@@ -1,27 +1,21 @@
 # Frontend
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 11.0.4.
+This project is the place where user interacts with system.
 
-## Development server
+## Preparetation
+In order to run this project, you will need to have nodejs bundled with npm installed on your system. You can checkout official [nodejs](https://nodejs.org/) page for more information about installation. In order to install project's dependencies, run the command below in this directory:
+```bash
+npm install
+```
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The app will automatically reload if you change any of the source files.
+## Configuration
 
-## Code scaffolding
+You should configure the application according to your need. You can specify the backend endpoint in the file ```src/environments/environment.ts```. The key ```apiEndpoint``` should be directing to your [backend](https://github.com/nanonetworking/kr-testbed-api/tree/master/backend).
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+## Running
 
-## Build
-
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory. Use the `--prod` flag for a production build.
-
-## Running unit tests
-
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
-
-## Running end-to-end tests
-
-Run `ng e2e` to execute the end-to-end tests via [Protractor](http://www.protractortest.org/).
-
-## Further help
-
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+To start a live server and directly use application on a browser, you can type 
+```bash
+npm run start
+```
+Upon completion of build, you can browse **http://127.0.0.1:4100** and see the application. If you want a functional app, you must be running [backend](https://github.com/nanonetworking/kr-testbed-api/tree/master/backend) already.
