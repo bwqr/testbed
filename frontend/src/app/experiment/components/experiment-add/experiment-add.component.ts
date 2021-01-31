@@ -49,7 +49,7 @@ export class ExperimentAddComponent extends MainComponent implements OnInit {
         }),
         finalize(() => this.leaveProcessingState())
       ).subscribe(_ => {
-        this.service.alertSuccess('holaaa');
+        this.service.alertSuccess('Experiment is created.');
 
         return this.router.navigate(['../experiments'], {relativeTo: this.activatedRoute});
       })

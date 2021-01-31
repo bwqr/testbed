@@ -22,7 +22,7 @@ export class UserViewModelService extends MainViewModelService {
   }
 
   user(): Observable<User> {
-    return this.requestService.makeGetRequest(routes.user.profile);
+    return this.cacheService.get('user.user', this.requestService.makeGetRequest(routes.user.profile));
   }
 
   updateProfile(firstName: string, lastName: string): Observable<SuccessResponse> {

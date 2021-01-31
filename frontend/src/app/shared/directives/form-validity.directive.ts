@@ -28,9 +28,9 @@ export class FormValidityDirective implements OnInit, OnDestroy {
 
   checkValidity(): void {
     if (this.control.errors && this.control.dirty) {
-      this.el.nativeElement.style.borderColor = 'red';
+      this.el.nativeElement.classList.add('is-error');
     } else {
-      this.el.nativeElement.style.borderColor = '';
+      this.el.nativeElement.classList.remove('is-error');
     }
   }
 

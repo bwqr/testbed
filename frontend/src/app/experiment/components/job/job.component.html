@@ -1,0 +1,20 @@
+<div class="container mt-4">
+  <div class="mb-5">
+    <h2 class="title">Job</h2>
+    <hr>
+  </div>
+
+  <div *ngIf="job">
+    <ul>
+      <li>{{job.id}}</li>
+      <li>{{job.experimentId}}</li>
+      <li>{{job.runnerId}}</li>
+      <li>{{runner.name}}</li>
+      <li>{{job.code}}</li>
+      <li>{{job.output || ''}}</li>
+      <li>{{job.status}}</li>
+      <li>{{job.createdAt}}</li>
+      <li>{{job.updatedAt}}</li>
+    </ul>
+  </div>
+</div>

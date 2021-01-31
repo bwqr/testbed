@@ -1,11 +1,13 @@
 import {NgModule} from '@angular/core';
 import {RouterModule, Routes} from '@angular/router';
 import {NavigationComponent} from './navigation/components/navigation/navigation.component';
+import {UserResolveService} from './user/services/user-resolve.service';
 
 const routes: Routes = [
   {path: '', redirectTo: 'user/profile', pathMatch: 'full'},
   {
-    path: '', component: NavigationComponent, children: [
+    path: '', component: NavigationComponent, resolve: {user: UserResolveService},
+    children: [
       {
         path: 'user',
         loadChildren: () => import('src/app/user/user.module').then(m => m.UserModule)

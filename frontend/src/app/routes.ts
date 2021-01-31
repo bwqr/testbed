@@ -1,19 +1,25 @@
 import {environment} from '../environments/environment';
 
+const experiment = environment.apiEndpoint + '/experiment';
+const user = environment.apiEndpoint + '/user';
+const auth = environment.apiEndpoint + '/auth';
+
 export const routes = {
   user: {
-    profile: environment.apiEndpoint + '/user/profile',
-    password: environment.apiEndpoint + '/user/password'
+    profile: user + '/profile',
+    password: user + '/password'
   },
   experiment: {
-    experiments: environment.apiEndpoint + '/experiment/experiments',
-    experiment: environment.apiEndpoint + '/experiment/experiment',
+    runners: experiment + '/runners',
+    experiments: experiment + '/experiments',
+    experiment: experiment + '/experiment',
+    job: experiment + '/job'
   },
   auth: {
-    login: environment.apiEndpoint + '/auth/login',
-    signUp: environment.apiEndpoint + '/auth/sign-up',
-    verifyAccount: environment.apiEndpoint + '/auth/verify-account',
-    resetPassword: environment.apiEndpoint + '/auth/reset-password',
-    forgotPassword: environment.apiEndpoint + '/auth/forgot-password'
+    login: auth + '/login',
+    signUp: auth + '/sign-up',
+    verifyAccount: auth + '/verify-account',
+    resetPassword: auth + '/reset-password',
+    forgotPassword: auth + '/forgot-password'
   }
 };

@@ -6,10 +6,11 @@ import {CoreModule} from '../core/core.module';
 import {SharedModule} from '../shared/shared.module';
 import { ExperimentComponent } from './components/experiment/experiment.component';
 import { ExperimentAddComponent } from './components/experiment-add/experiment-add.component';
+import { JobComponent } from './components/job/job.component';
 
 
 @NgModule({
-  declarations: [ExperimentsComponent, ExperimentComponent, ExperimentAddComponent],
+  declarations: [ExperimentsComponent, ExperimentComponent, ExperimentAddComponent, JobComponent],
   imports: [
     CommonModule,
     ExperimentRoutingModule,
