@@ -9,14 +9,14 @@ use crate::ModelId;
 
 pub struct Executor {
     connection: Addr<Connection>,
-    docker_path: String
+    docker_path: String,
 }
 
 impl Executor {
     pub fn new(connection: Addr<Connection>, docker_path: String) -> Self {
         Executor {
             connection,
-            docker_path
+            docker_path,
         }
     }
 
@@ -43,7 +43,11 @@ impl Executor {
             .map_err(|e| Error::IO(e))?;
 
         if !output.status.success() {
-            return Err(Error::Output(String::from_utf8(output.stderr).map_err(|e| Error::String(e))?));
+            // concatenate stdout and stderr
+            let mut err = String::from_utf8(output.stdout).map_err(|e| Error::String(e))?;
+            err += String::from_utf8(output.stderr).map_err(|e| Error::String(e))?.as_str();
+
+            return Err(Error::Output(err));
         }
 
         info!(
@@ -78,7 +82,7 @@ impl Handler<RunMessage> for Executor {
             Err(e) => {
                 error!("could not execute the job, {:?}", e);
 
-                (format!("{:?}", e), false)
+                (e.to_string(), false)
             }
         };
 
@@ -98,4 +102,14 @@ pub enum Error {
     IO(std::io::Error),
     String(std::string::FromUtf8Error),
     Output(String),
+}
+
+impl Error {
+    pub fn to_string(self) -> String {
+        match self {
+            Error::IO(io) => format!("{:?}", io),
+            Error::String(utf8) => format!("{:?}", utf8),
+            Error::Output(output) => output
+        }
+    }
 }

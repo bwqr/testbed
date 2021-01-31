@@ -23,5 +23,6 @@ pub struct JoinServerMessage {
 pub struct RunResultMessage {
     pub runner_id: ModelId,
     pub job_id: ModelId,
+    pub output: String,
     pub successful: bool,
 }

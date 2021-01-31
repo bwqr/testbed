@@ -133,6 +133,7 @@ impl Handler<RunResultMessage> for ExperimentServer {
                 None => false
             };
 
+            // if runner is this one, mark it empty and if there is pending jobs, run it
             if correct_run {
                 runner.1 = None;
 
@@ -152,7 +153,7 @@ impl Handler<RunResultMessage> for ExperimentServer {
         async move {
             if let Err(e) = web::block(move ||
                 diesel::update(jobs::table.find(msg.job_id))
-                    .set(jobs::status.eq(status.value()))
+                    .set((jobs::status.eq(status.value()), jobs::output.eq(Some(msg.output))))
                     .execute(&conn)
             )
                 .await {

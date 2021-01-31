@@ -16,8 +16,11 @@ pub fn register(config: &mut web::ServiceConfig) {
                 .service(
                     web::scope("")
                         .wrap(Auth)
+                        .service(handlers::fetch_runners)
                         .service(handlers::fetch_experiments)
                         .service(handlers::fetch_experiment)
+                        .service(handlers::fetch_experiment_jobs)
+                        .service(handlers::fetch_job)
                         .service(handlers::create_new_experiment)
                         .service(handlers::update_experiment_name)
                         .service(handlers::update_experiment_code)

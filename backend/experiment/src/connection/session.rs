@@ -45,6 +45,7 @@ impl Session {
                         let msg = RunResultMessage {
                             job_id: run_result.data.job_id,
                             runner_id: self.runner_id,
+                            output: run_result.data.output,
                             successful: run_result.data.successful,
                         };
 

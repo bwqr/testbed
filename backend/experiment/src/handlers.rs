@@ -2,6 +2,7 @@ use actix::Addr;
 use actix_web::{delete, get, HttpRequest, HttpResponse, post, put, web};
 use actix_web_actors::ws;
 use diesel::prelude::*;
+use diesel::result::Error;
 use log::error;
 
 use core::db::DieselEnum;
@@ -18,8 +19,8 @@ use user::models::user::User;
 use crate::connection::server::{ExperimentServer, RunExperimentMessage};
 use crate::connection::session::Session;
 use crate::models::experiment::{Experiment, SLIM_EXPERIMENT_COLUMNS, SlimExperiment};
-use crate::models::job::{Job, JobStatus};
-use crate::models::runner::{Runner, RunnerToken};
+use crate::models::job::{Job, JobStatus, SLIM_JOB_COLUMNS, SlimJob};
+use crate::models::runner::{Runner, RunnerToken, SLIM_RUNNER_COLUMNS, SlimRunner};
 use crate::requests::{ExperimentCodeRequest, ExperimentNameRequest};
 
 #[get("ws")]
@@ -46,6 +47,20 @@ pub async fn join_server(
         .map_err(|_| Box::new(ErrorMessage::WebSocketConnectionError) as Box<dyn ErrorMessaging>)
 }
 
+#[get("runners")]
+pub async fn fetch_runners(pool: web::Data<DBPool>) -> DefaultResponse {
+    let conn = pool.get().unwrap();
+
+    let runners = web::block(move ||
+        runners::table
+            .select(SLIM_RUNNER_COLUMNS)
+            .load::<SlimRunner>(&conn)
+    )
+        .await?;
+
+    Ok(HttpResponse::Ok().json(runners))
+}
+
 #[get("experiments")]
 pub async fn fetch_experiments(pool: web::Data<DBPool>, user: User, pagination: web::Query<PaginationRequest>) -> DefaultResponse {
     let conn = pool.get().unwrap();
@@ -67,14 +82,56 @@ pub async fn fetch_experiments(pool: web::Data<DBPool>, user: User, pagination: 
 pub async fn fetch_experiment(pool: web::Data<DBPool>, experiment_id: web::Path<ModelId>, user: User) -> DefaultResponse {
     let conn = pool.get().unwrap();
 
-    let experiment = web::block(move || experiments::table
-        .filter(experiments::user_id.eq(user.id))
-        .find(experiment_id.into_inner())
-        .first::<Experiment>(&conn)
+    let experiment = web::block(move ||
+        experiments::table
+            .filter(experiments::user_id.eq(user.id))
+            .find(experiment_id.into_inner())
+            .first::<Experiment>(&conn)
     )
         .await?;
 
     Ok(HttpResponse::Ok().json(experiment))
+}
+
+#[get("experiment/{id}/jobs")]
+pub async fn fetch_experiment_jobs(pool: web::Data<DBPool>, experiment_id: web::Path<ModelId>, user: User, pagination: web::Query<PaginationRequest>) -> DefaultResponse {
+    let conn = pool.get().unwrap();
+
+    let jobs = web::block(move || -> Result<_, Error>{
+        let experiment = experiments::table
+            .filter(experiments::user_id.eq(user.id))
+            .find(experiment_id.into_inner())
+            .first::<Experiment>(&conn)?;
+
+        jobs::table
+            .filter(jobs::experiment_id.eq(experiment.id))
+            .inner_join(runners::table)
+            .select(((SLIM_JOB_COLUMNS, SLIM_RUNNER_COLUMNS), CountStarOver))
+            .paginate(pagination.page)
+            .per_page(pagination.per_page)
+            .load_and_count_pages::<(SlimJob, SlimRunner)>(&conn)
+    })
+        .await?;
+
+    Ok(HttpResponse::Ok().json(jobs))
+}
+
+#[get("job/{id}")]
+pub async fn fetch_job(pool: web::Data<DBPool>, job_id: web::Path<ModelId>, user: User) -> DefaultResponse {
+    let conn = pool.get().unwrap();
+
+    let job = web::block(move ||
+        jobs::table
+            .filter(jobs::id.eq(job_id.into_inner()))
+            .inner_join(runners::table)
+            .inner_join(experiments::table)
+            .filter(experiments::user_id.eq(user.id))
+            .select((jobs::all_columns, SLIM_RUNNER_COLUMNS))
+            .first::<(Job, SlimRunner)>(&conn)
+    )
+        .await?;
+
+    Ok(HttpResponse::Ok().json(job))
 }
 
 #[post("experiment")]

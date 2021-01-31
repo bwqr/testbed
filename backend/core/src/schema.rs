@@ -15,6 +15,7 @@ table! {
         experiment_id -> Int4,
         runner_id -> Int4,
         code -> Text,
+        output -> Nullable<Text>,
         status -> Varchar,
         created_at -> Timestamp,
         updated_at -> Timestamp,
@@ -31,6 +32,7 @@ table! {
 table! {
     runners (id) {
         id -> Int4,
+        name -> Varchar,
         access_key -> Varchar,
         created_at -> Timestamp,
     }

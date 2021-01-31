@@ -39,6 +39,7 @@ create table experiments
 create table runners
 (
     id         serial PRIMARY KEY  NOT NULL,
+    name       varchar(256)        NOT NULL,
     access_key varchar(191) UNIQUE NOT NULL,
     created_at timestamp           NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -49,6 +50,7 @@ create table jobs
     experiment_id integer            NOT NULL,
     runner_id     integer            NOT NULL,
     code          text               NOT NULL,
+    output        text,
     status        varchar(11)        NOT NULL DEFAULT 'Pending' CHECK ( status in ('Pending', 'Running', 'Successful', 'Failed') ),
     created_at    timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -56,5 +58,5 @@ create table jobs
     CONSTRAINT job_runner_id FOREIGN KEY (runner_id) REFERENCES runners (id) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-insert into runners (access_key)
-values ('runner_1')
+insert into runners (name, access_key)
+values ('NanoNetworking Testbed', 'runner_1')
