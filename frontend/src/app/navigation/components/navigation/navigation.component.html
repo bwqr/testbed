@@ -1,3 +1,22 @@
+<div
+  style=" top: 0; left: 0; width: 100%; background-color: wheat; z-index: 9; display: flex; justify-content: center"
+  *ngIf="!(connectionStatus === statuses.Initial || connectionStatus === statuses.Open)">
+  <div class="p-1">
+    <span class="mx-2">Lost Connection.</span>
+    <ng-container [ngSwitch]="connectionStatus">
+      <ng-container *ngSwitchCase="statuses.Closed">
+        <span>Will try to connect in {{willReconnectIn}} seconds.</span>
+        <button class="btn btn-sm btn-link p-0 mx-2" *ngIf="connectionStatus === statuses.Closed; else reconnecting"
+                (click)="reconnect()">
+          Reconnect Now
+        </button>
+      </ng-container>
+      <ng-container *ngSwitchCase="statuses.Reconnecting"><span>Connection</span></ng-container>
+    </ng-container>
+
+    <ng-template #reconnecting></ng-template>
+  </div>
+</div>
 <div>
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <a class="navbar-brand" href="#">nrg-testbed</a>

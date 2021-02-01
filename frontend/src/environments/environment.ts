@@ -4,6 +4,7 @@
 
 export const environment = {
   production: false,
+  wsEndpoint: 'ws://127.0.0.1:8040/api/ws',
   apiEndpoint: 'http://127.0.0.1:8040/api'
 };
 

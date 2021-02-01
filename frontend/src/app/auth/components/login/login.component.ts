@@ -5,6 +5,7 @@ import {MainComponent} from '../../../shared/components/main/main.component';
 import {ErrorMessage} from '../../../core/models';
 import {catchError, finalize} from 'rxjs/operators';
 import {Router} from '@angular/router';
+import {WebSocketService} from '../../../core/services/web-socket.service';
 
 @Component({
   selector: 'app-login',
@@ -20,7 +21,8 @@ export class LoginComponent extends MainComponent implements OnInit {
   constructor(
     private viewModel: AuthViewModelService,
     private formBuilder: FormBuilder,
-    private router: Router
+    private router: Router,
+    private webSocketService: WebSocketService
   ) {
     super();
 
@@ -48,6 +50,12 @@ export class LoginComponent extends MainComponent implements OnInit {
         }),
         finalize(() => this.leaveProcessingState())
       ).subscribe(_ => {
+        try {
+          this.webSocketService.connect();
+        } catch (e) {
+          console.error(e);
+        }
+
         return this.router.navigate(['/']);
       })
     );
