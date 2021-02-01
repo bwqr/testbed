@@ -1,6 +1,6 @@
 # kr-testbed-api
 
-This project enables a user to control nanonetworking testbed remotely by submitting his/her own code via web application.
+This project enables an user to control nanonetworking testbed remotely by submitting his/her own code via web application.
 
 Project consists of four parts:
 * Backend
@@ -18,7 +18,7 @@ Frontend is the place where user interacts with system.
 Executor handles user's code. It is placed inside the [backend](https://github.com/nanonetworking/kr-testbed-api/tree/master/backend) directory
 
 ### Testbed API
-Testbed API provides set of function to user in order to interact with Nanonetworking Testbed. It is placed inside the [experiment](https://github.com/nanonetworking/kr-testbed-api/tree/master/experiment)
+Testbed API provides set of functions to user in order to interact with Nanonetworking Testbed. It is placed inside the [experiment](https://github.com/nanonetworking/kr-testbed-api/tree/master/experiment)
 
 ## Running the project
 
