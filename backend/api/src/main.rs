@@ -6,15 +6,18 @@ use std::sync::mpsc::channel;
 
 use actix::prelude::*;
 use actix_cors::Cors;
-use actix_web::{App, http::header, HttpServer, middleware};
+use actix_web::{App, http::header, HttpServer, middleware, web};
 use diesel::{PgConnection, r2d2};
 
 use core::Config;
-use core::utils::Algorithm;
+use core::middlewares::auth::Auth;
 use core::types::DBPool;
+use core::utils::Algorithm;
 use core::utils::Hash;
 use experiment::ExperimentServer;
-use service::{ClientServices, MailClient, MailClientMock, MailService, SendMailMessage};
+use service::{ClientServices, mail::{MailClient, MailClientMock, MailService, SendMailMessage}, NotificationServer, Servers, SessionManager};
+
+mod handlers;
 
 lazy_static! {
     static ref SECRET_KEY: String = std::env::var("SECRET_KEY").expect("SECRET_KEY is not provided in env");
@@ -56,11 +59,36 @@ fn setup_services() -> ClientServices {
     }
 }
 
-fn setup_experiment_server(pool: DBPool) -> Addr<ExperimentServer> {
+fn setup_servers() -> Servers {
+    let (notification_tx, notification_rx) = channel::<Addr<NotificationServer>>();
+    std::thread::Builder::new().name("notification_server".to_string()).spawn(move || {
+        let sys = System::new("notification_server");
+        let notification = NotificationServer::new().start();
+        notification_tx.send(notification).expect("Failed to send NotificationServer from thread");
+        sys.run()
+    }).expect("Failed to initialize thread");
+
+    let notification = notification_rx.recv().expect("Failed to receive NotificationServer from thread");
+
+    let (session_tx, session_rx) = channel::<Servers>();
+    std::thread::Builder::new().name("session_manager".to_string()).spawn(move || {
+        let sys = System::new("session_manager");
+        let session_manager = SessionManager::new(notification.clone()).start();
+        session_tx.send(Servers {
+            notification,
+            session_manager,
+        }).expect("Failed to send Servers from thread");
+        sys.run()
+    }).expect("Failed to initialize thread");
+
+    session_rx.recv().expect("Failed to receive Servers from thread")
+}
+
+fn setup_experiment_server(pool: DBPool, notification: Addr<NotificationServer>) -> Addr<ExperimentServer> {
     let (tx, rx) = channel::<Addr<ExperimentServer>>();
     std::thread::Builder::new().name("experiment_server".to_string()).spawn(move || {
         let sys = System::new("experiment_server");
-        let experiment_server = ExperimentServer::new(pool).start();
+        let experiment_server = ExperimentServer::new(pool, notification).start();
         tx.send(experiment_server).expect("Failed to send ExperimentServer from thread");
         sys.run()
     }).expect("Failed to initialize thread");
@@ -85,7 +113,11 @@ async fn main() -> std::io::Result<()> {
     // Create utils
     let hash = Hash::new(&*SECRET_KEY, Algorithm::HS256);
 
-    let experiment_server = setup_experiment_server(pool.clone());
+    // Setup servers
+    let servers = setup_servers();
+
+    let experiment_server = setup_experiment_server(pool.clone(), servers.notification.clone());
+
 
     let config = Arc::new(Config {
         web_app_url: std::env::var("WEB_APP_URL").expect("WEB_APP_URL is not provided in env"),
@@ -109,9 +141,15 @@ async fn main() -> std::io::Result<()> {
             .data(pool.clone())
             .data(config.clone())
             .data(client_services.clone())
+            .data(servers.clone())
             .configure(user::register)
             .configure(auth::register)
             .configure(experiment::register)
+            .service(
+                web::scope("api")
+                    .wrap(Auth)
+                    .service(handlers::join_chat_server)
+            )
     })
         .bind(std::env::var("APP_BIND_ADDRESS").expect("APP_BIND_ADDRESS is not provided in env").as_str())?;
 

@@ -16,6 +16,7 @@ experiment = { path = "../experiment" }
 actix = "0.10"
 actix-web = "3"
 actix-cors = "0.5"
+actix-web-actors = "3"
 
 diesel = { version = "1.4", features = ["postgres", "r2d2", "chrono"] }
 

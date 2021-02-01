@@ -10,6 +10,7 @@ edition = "2018"
 core = { path = "../core" }
 shared = { path = "../shared" }
 user = { path = "../user" }
+service = {path = "../service"}
 derive = { path = "../derive" }
 
 actix = "0.10"

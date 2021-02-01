@@ -37,7 +37,7 @@ pub const SLIM_JOB_COLUMNS: (jobs::id, jobs::experiment_id, jobs::runner_id, job
 );
 
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub enum JobStatus {
     Pending,
     Running,

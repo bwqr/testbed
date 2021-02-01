@@ -4,10 +4,12 @@ use actix::prelude::*;
 use actix_web::web;
 use diesel::prelude::*;
 use log::{error, info};
+use serde::Serialize;
 
 use core::db::DieselEnum;
-use core::schema::jobs;
+use core::schema::{experiments, jobs};
 use core::types::{DBPool, ModelId};
+use service::{Notification, NotificationKind, NotificationMessage, NotificationServer};
 
 use crate::connection::messages::{JoinServerMessage, RunMessage, RunResultMessage};
 use crate::connection::session::Session;
@@ -24,14 +26,16 @@ pub struct ExperimentServer {
     pending_runs: Vec<ModelId>,
     // run_id -> (session, run_id)
     runners: HashMap<ModelId, (Addr<Session>, Option<ModelId>)>,
+    notification: Addr<NotificationServer>,
 }
 
 impl ExperimentServer {
-    pub fn new(pool: DBPool) -> Self {
+    pub fn new(pool: DBPool, notification: Addr<NotificationServer>) -> Self {
         ExperimentServer {
             pool,
             pending_runs: Vec::new(),
             runners: HashMap::new(),
+            notification,
         }
     }
 
@@ -149,19 +153,49 @@ impl Handler<RunResultMessage> for ExperimentServer {
         };
 
         let conn = self.pool.get().unwrap();
+        let notification = self.notification.clone();
 
         async move {
-            if let Err(e) = web::block(move ||
+            // clone required things
+            let job_id = msg.job_id;
+            let status_clone = status.clone();
+
+            let res = web::block(move || {
                 diesel::update(jobs::table.find(msg.job_id))
                     .set((jobs::status.eq(status.value()), jobs::output.eq(Some(msg.output))))
-                    .execute(&conn)
-            )
-                .await {
-                error!("updating jobs status is failed: {:?}", e);
+                    .execute(&conn)?;
+
+                experiments::table
+                    .inner_join(jobs::table)
+                    .filter(jobs::id.eq(msg.job_id))
+                    .select(experiments::user_id)
+                    .first::<ModelId>(&conn)
+            })
+                .await;
+
+            //notify the user
+            if let Ok(user_id) = res {
+                notification.do_send(Notification {
+                    user_id,
+                    message: NotificationMessage {
+                        kind: NotificationKind::JobUpdate,
+                        data: JobUpdate {
+                            job_id,
+                            status: status_clone,
+                        },
+                    },
+                });
             }
         }.into_actor(self)
             .spawn(ctx);
     }
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct JobUpdate {
+    job_id: ModelId,
+    status: JobStatus,
 }
 
 pub enum Error {
