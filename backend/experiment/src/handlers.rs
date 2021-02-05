@@ -200,7 +200,7 @@ pub async fn run_experiment(
     let conn = pool.get().unwrap();
     let (experiment_id, runner_id) = ids.into_inner();
 
-    let job = web::block(move || {
+    let mut job = web::block(move || {
         let experiment = experiments::table
             .filter(experiments::user_id.eq(user.id))
             .find(experiment_id)
@@ -216,18 +216,22 @@ pub async fn run_experiment(
     })
         .await?;
 
+    let job_id = job.id;
+
     if let Err(e) = experiment_server.send(RunExperimentMessage { job_id: job.id })
         .await {
         error!("Error while sending run to ExperimentServer: {:?}", e);
 
-        web::block(move || diesel::update(jobs::table.find(job.id))
+        web::block(move || diesel::update(jobs::table.find(job_id))
             .set(jobs::status.eq(JobStatus::Failed.value()))
             .execute(&pool.get().unwrap())
         )
             .await?;
+
+        job.status = JobStatus::Failed;
     }
 
-    Ok(HttpResponse::Ok().json(SuccessResponse::default()))
+    Ok(HttpResponse::Ok().json(job))
 }
 
 /// This will return a SuccessResponse even though delete may not occur if experiment's user id is not

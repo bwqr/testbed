@@ -39,6 +39,19 @@ impl ExperimentServer {
         }
     }
 
+    async fn send_status_notification(addr: Addr<NotificationServer>, user_id: ModelId, job_id: ModelId, status: JobStatus) {
+        addr.do_send(Notification {
+            user_id,
+            message: NotificationMessage {
+                kind: NotificationKind::JobUpdate,
+                data: JobUpdate {
+                    job_id,
+                    status,
+                },
+            },
+        });
+    }
+
     fn run(&mut self, job_id: ModelId, ctx: &mut <Self as Actor>::Context) {
         let mut inactive_runner_id: Option<ModelId> = None;
 
@@ -175,16 +188,8 @@ impl Handler<RunResultMessage> for ExperimentServer {
 
             //notify the user
             if let Ok(user_id) = res {
-                notification.do_send(Notification {
-                    user_id,
-                    message: NotificationMessage {
-                        kind: NotificationKind::JobUpdate,
-                        data: JobUpdate {
-                            job_id,
-                            status: status_clone,
-                        },
-                    },
-                });
+                Self::send_status_notification(notification, user_id, job_id, status_clone)
+                    .await;
             }
         }.into_actor(self)
             .spawn(ctx);
