@@ -11,7 +11,7 @@
         <label for="runner-id" class="mx-2">Runner</label>
         <div class="nes-select mx-2" style="max-width: 300px">
           <select formControlName="runnerId" id="runner-id">
-            <option *ngFor="let runner of runners" [value]="runner.id">{{runner.name}}</option>
+            <option *ngFor="let runner of runners" [ngValue]="runner.id">{{runner.name}}</option>
           </select>
         </div>
         <button class="nes-btn is-success mx-2" type="submit" [disabled]="!formGroup.valid || isInProcessingState">

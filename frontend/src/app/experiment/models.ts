@@ -27,6 +27,12 @@ export interface Job extends SlimJob {
   output?: string;
 }
 
+
+export interface JobUpdate {
+  jobId: number;
+  status: JobStatus;
+}
+
 export enum JobStatus {
   Pending = 'Pending',
   Running = 'Running',

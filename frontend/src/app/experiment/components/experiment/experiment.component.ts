@@ -1,16 +1,17 @@
 import {Component, ElementRef, OnInit, ViewChild} from '@angular/core';
 import {MainComponent} from '../../../shared/components/main/main.component';
 import {ExperimentViewModelService} from '../../services/experiment-view-model.service';
-import {Experiment, SlimJob, SlimRunner} from '../../models';
+import {Experiment, JobUpdate, SlimJob, SlimRunner} from '../../models';
 import {ActivatedRoute} from '@angular/router';
-import {finalize, switchMap} from 'rxjs/operators';
+import {filter, finalize, map, switchMap} from 'rxjs/operators';
 import CodeMirror from 'codemirror';
 import * as python from 'codemirror/mode/python/python.js';
 import {MainService} from '../../../core/services/main.service';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 import {combineLatest} from 'rxjs';
 import {Pagination} from '../../../core/models';
-import {PaginationService} from '../../../core/services/pagination.service';
+import {WebSocketService} from '../../../core/services/web-socket.service';
+import {NotificationKind} from '../../../core/websocket/models';
 
 // This expression is required since we want python to be imported and included in output of webpack
 // tslint:disable-next-line:no-unused-expression
@@ -44,12 +45,23 @@ export class ExperimentComponent extends MainComponent implements OnInit {
     private service: MainService,
     private activatedRoute: ActivatedRoute,
     private formBuilder: FormBuilder,
-    private paginationService: PaginationService
+    private webSocketService: WebSocketService
   ) {
     super();
 
     this.formGroup = formBuilder.group({
       runnerId: formBuilder.control('', [Validators.required]),
+    });
+
+    this.webSocketService.listenNotifications().pipe(
+      filter(notification => notification.message.kind === NotificationKind.JobUpdate),
+      map(notification => notification.message.data as JobUpdate)
+    ).subscribe(notification => {
+      const index = this.jobs.items.findIndex(jr => jr[0].id === notification.jobId);
+
+      if (index > -1) {
+        this.jobs.items[index][0].status = notification.status;
+      }
     });
   }
 
@@ -60,9 +72,13 @@ export class ExperimentComponent extends MainComponent implements OnInit {
 
     this.subs.add(
       this.activatedRoute.params.pipe(
-        switchMap((params) => this.viewModel.experiment(params.id))
-      ).subscribe(experiment => {
+        switchMap((params) => combineLatest([
+          this.viewModel.experiment(params.id),
+          this.viewModel.experimentJobs(params.id)
+        ]))
+      ).subscribe(([experiment, jobs]) => {
         this.experiment = experiment;
+        this.jobs = jobs;
 
         // experiment.code is html encoded, we need to decode it
         const el = document.createElement('div');
@@ -83,14 +99,6 @@ export class ExperimentComponent extends MainComponent implements OnInit {
         });
       })
     );
-
-    this.subs.add(
-      combineLatest([this.activatedRoute.params, this.activatedRoute.queryParams]).pipe(
-        switchMap(([params, queryParams]) =>
-          this.viewModel.experimentJobs(params.id, this.paginationService.getPaginationFromParams(queryParams))
-        )
-      ).subscribe((jobs) => this.jobs = jobs)
-    );
   }
 
   saveExperiment(): void {
@@ -106,12 +114,16 @@ export class ExperimentComponent extends MainComponent implements OnInit {
 
   runExperiment(value: { runnerId: number }): void {
     this.enterProcessingState();
+    const runner = this.runners.find(r => r.id === value.runnerId);
 
     this.subs.add(
       this.viewModel.runExperiment(this.experiment.id, value.runnerId).pipe(
         finalize(() => this.leaveProcessingState())
       )
-        .subscribe(_ => this.service.alertSuccess('Experiment is queued to run'))
+        .subscribe(job => {
+          this.jobs.items.unshift([job, runner]);
+          this.service.alertSuccess('Experiment is queued to run');
+        })
     );
   }
 }
