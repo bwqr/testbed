@@ -18,14 +18,13 @@ use crate::models::job::{Job, JobStatus};
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct RunExperimentMessage {
-    pub job_id: ModelId
+    pub job: Job
 }
 
 pub struct ExperimentServer {
     pool: DBPool,
-    pending_runs: Vec<ModelId>,
-    // run_id -> (session, run_id)
-    runners: HashMap<ModelId, (Addr<Session>, Option<ModelId>)>,
+    // run_id -> (session, running job, pending jobs)
+    runners: HashMap<ModelId, (Addr<Session>, Option<ModelId>, Vec<Job>)>,
     notification: Addr<NotificationServer>,
 }
 
@@ -33,7 +32,6 @@ impl ExperimentServer {
     pub fn new(pool: DBPool, notification: Addr<NotificationServer>) -> Self {
         ExperimentServer {
             pool,
-            pending_runs: Vec::new(),
             runners: HashMap::new(),
             notification,
         }
@@ -52,36 +50,23 @@ impl ExperimentServer {
         });
     }
 
-    fn run(&mut self, job_id: ModelId, ctx: &mut <Self as Actor>::Context) {
-        let mut inactive_runner_id: Option<ModelId> = None;
+    fn run(&mut self, job: Job, ctx: &mut <Self as Actor>::Context) -> Result<(), String> {
+        let runner = self.runners.get_mut(&job.runner_id)
+            .ok_or(format!("Unknown runner {} for job {}", job.runner_id, job.id))?;
 
-        for (id, v) in &self.runners {
-            if let None = v.1 {
-                inactive_runner_id = Some(*id);
-                break;
-            }
-        }
-
-        // If there is an inactive runner
-        if let Some(runner_id) = inactive_runner_id {
-            let runner = self.runners.get_mut(&runner_id).unwrap();
-            // mark this runner as active
-            runner.1 = Some(job_id);
+        // if runner is idle
+        if let None = runner.1 {
+            // set runner in progress
+            runner.1 = Some(job.id);
 
             let addr = runner.0.clone();
-
-            let conn = self.pool.get().unwrap();
             async move {
-                let job = web::block(move || jobs::table.find(job_id).first::<Job>(&conn))
+                // We have to decode the job.code in order to replace encoded html characters like '<' char
+                addr.send(RunMessage { job_id: job.id, code: core::decode_html(job.code.as_str()).unwrap() })
                     .await
-                    .map_err(|_| Error::DB(job_id))?;
+                    .map_err(|_| Error::Send(job.id))?;
 
-                // We have to decode the job.code in order to replace encoded html characters like < char
-                addr.send(RunMessage { job_id, code: core::decode_html(job.code.as_str()).unwrap() })
-                    .await
-                    .map_err(|_| Error::Send(job_id))?;
-
-                Ok(job_id)
+                Ok(job.id)
             }
                 .into_actor(self)
                 .then(|result, act, _| {
@@ -90,7 +75,7 @@ impl ExperimentServer {
                     async move {
                         let (status, job_id) = match result {
                             Ok(job_id) => (JobStatus::Running, job_id),
-                            Err(Error::Send(job_id)) | Err(Error::DB(job_id)) => (JobStatus::Failed, job_id),
+                            Err(Error::Send(job_id)) => (JobStatus::Failed, job_id),
                         };
 
                         if let Err(e) = web::block(move || diesel::update(jobs::table.find(job_id))
@@ -103,30 +88,37 @@ impl ExperimentServer {
                     }
                         .into_actor(act)
                 })
-                .spawn(ctx)
+                .spawn(ctx);
+        } else {
+            // push job into pending queue
+            runner.2.push(job)
         }
-        // Otherwise push it into pending
-        else {
-            self.pending_runs.push(job_id);
-        }
+
+        Ok(())
     }
 }
 
 impl Actor for ExperimentServer {
     type Context = Context<Self>;
 
-    fn started(&mut self, _: &mut Self::Context) {}
+    fn started(&mut self, _: &mut Self::Context) {
+        info!("ExperimentServer is started!");
+    }
 
-    fn stopped(&mut self, _: &mut Self::Context) {}
+    fn stopped(&mut self, _: &mut Self::Context) {
+        info!("ExperimentServer is stopped!");
+    }
 }
 
 impl Handler<RunExperimentMessage> for ExperimentServer {
     type Result = ();
 
     fn handle(&mut self, msg: RunExperimentMessage, ctx: &mut Self::Context) {
-        info!("Job with id {} received ", msg.job_id);
+        info!("Job with id {} received ", msg.job.id);
 
-        self.run(msg.job_id, ctx);
+        if let Err(e) = self.run(msg.job, ctx) {
+            error!("Error while running job, error {}", e);
+        }
     }
 }
 
@@ -134,7 +126,7 @@ impl Handler<JoinServerMessage> for ExperimentServer {
     type Result = ();
 
     fn handle(&mut self, msg: JoinServerMessage, _: &mut Self::Context) {
-        self.runners.insert(msg.runner_id, (msg.addr, None));
+        self.runners.insert(msg.runner_id, (msg.addr, None, Vec::new()));
     }
 }
 
@@ -154,8 +146,10 @@ impl Handler<RunResultMessage> for ExperimentServer {
             if correct_run {
                 runner.1 = None;
 
-                if let Some(job_id) = self.pending_runs.pop() {
-                    self.run(job_id, ctx);
+                if let Some(job) = runner.2.pop() {
+                    if let Err(e) = self.run(job, ctx) {
+                        error!("Error while running job, error {}", e);
+                    }
                 }
             }
         }
@@ -204,6 +198,5 @@ struct JobUpdate {
 }
 
 pub enum Error {
-    DB(ModelId),
     Send(ModelId),
 }

@@ -216,9 +216,9 @@ pub async fn run_experiment(
     })
         .await?;
 
+    let job_clone = job.clone();
     let job_id = job.id;
-
-    if let Err(e) = experiment_server.send(RunExperimentMessage { job_id: job.id })
+    if let Err(e) = experiment_server.send(RunExperimentMessage { job: job_clone })
         .await {
         error!("Error while sending run to ExperimentServer: {:?}", e);
 

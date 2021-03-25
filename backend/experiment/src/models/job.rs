@@ -8,7 +8,7 @@ use core::db::DieselEnum;
 use core::schema::jobs;
 use core::types::ModelId;
 
-#[derive(Identifiable, Queryable, Serialize)]
+#[derive(Identifiable, Queryable, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Job {
     pub id: ModelId,
