@@ -12,7 +12,7 @@ enum Spray {
 };
 
 enum Decoders {
-    WordEncoder
+    WordDecoder
 };
 
 struct Action {
@@ -51,8 +51,8 @@ struct Decoder {
     virtual State decode() const = 0;
 };
 
-struct WordEncoder : Decoder {
-    static const int id = Decoders::WordEncoder;
+struct WordDecoder : Decoder {
+    static const int id = Decoders::WordDecoder;
 
     State decode() const override {
 
@@ -96,8 +96,8 @@ struct WordEncoder : Decoder {
 };
 
 std::unique_ptr<Decoder> find_decoder(int decoder_id) {
-    if (decoder_id == WordEncoder::id) {
-        return std::unique_ptr<Decoder>(new struct WordEncoder());
+    if (decoder_id == WordDecoder::id) {
+        return std::unique_ptr<Decoder>(new struct WordDecoder());
     }
 
     return nullptr;
