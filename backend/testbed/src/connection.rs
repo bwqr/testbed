@@ -32,6 +32,7 @@ pub struct Connection {
     // this is the delay until we try connecting again
     current_timing_index: usize,
     executor: Option<Recipient<RunMessage>>,
+    pending_messages: Vec<Message>
 }
 
 impl Connection {
@@ -42,6 +43,7 @@ impl Connection {
             sink: None,
             current_timing_index: 0,
             executor: None,
+            pending_messages: Vec::new(),
         }
     }
 
@@ -109,6 +111,19 @@ impl Connection {
                         let (sink, stream) = framed.split();
                         Self::add_stream(stream, ctx);
                         act.sink = Some(SinkWrite::new(sink, ctx));
+
+                        // try to send pending messages
+                        let mut failed_messages = Vec::<Message>::new();
+                        // in order to borrow the sink, we have to do 'let Some' pattern. It should always pass this check
+                        if let Some(sink) = &mut act.sink {
+                            act.pending_messages.drain(..).for_each(|message| {
+                                if let Some(message) = sink.write(message) {
+                                    failed_messages.push(message);
+                                }
+                            });
+                        }
+                        act.pending_messages = failed_messages;
+
                         // we have connected now, reset timing
                         act.current_timing_index = 0;
                     }
@@ -172,15 +187,22 @@ impl Handler<RunResultMessage> for Connection {
     type Result = ();
 
     fn handle(&mut self, msg: RunResultMessage, _: &mut Self::Context) {
+        let message = Message::Text(serde_json::to_string(&server::SocketMessage {
+            kind: server::SocketMessageKind::RunResult,
+            data: server::RunResult {
+                job_id: msg.job_id,
+                output: msg.output,
+                successful: msg.successful,
+            },
+        }).unwrap());
+
         if let Some(sink) = &mut self.sink {
-            sink.write(Message::Text(serde_json::to_string(&server::SocketMessage {
-                kind: server::SocketMessageKind::RunResult,
-                data: server::RunResult {
-                    job_id: msg.job_id,
-                    output: msg.output,
-                    successful: msg.successful,
-                },
-            }).unwrap()));
+            // if write returns the message, sending was not successful, try to send it next time
+            if let Some(message) = sink.write(message) {
+                self.pending_messages.push(message);
+            }
+        } else { // if connection is not available, send it next time
+            self.pending_messages.push(message);
         }
     }
 }

@@ -52,8 +52,10 @@ impl Executor {
 
         info!(
             "successful execution, status {:?}, stdout {:?}, stderr {:?}",
-            output.status, String::from_utf8(output.stdout.clone()).map_err(|e| Error::String(e))?,
-            String::from_utf8(output.stderr).map_err(|e| Error::String(e))?);
+            output.status,
+            String::from_utf8(output.stdout.clone()).map_err(|e| Error::String(e))?,
+            String::from_utf8(output.stderr).map_err(|e| Error::String(e))?
+        );
 
         std::fs::remove_dir_all(dir.as_str())
             .map_err(|e| Error::IO(e))?;
