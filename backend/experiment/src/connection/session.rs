@@ -6,7 +6,7 @@ use core::types::ModelId;
 use shared::SocketErrorKind;
 use shared::websocket_messages::{client, server};
 
-use crate::connection::messages::{JoinServerMessage, RunMessage, RunResultMessage};
+use crate::connection::messages::{JoinServerMessage, RunMessage, RunResultMessage, DisconnectServerMessage};
 use crate::connection::server::ExperimentServer;
 
 pub struct Session {
@@ -89,7 +89,11 @@ impl Actor for Session {
             .spawn(ctx);
     }
 
-    fn stopped(&mut self, _: &mut Self::Context) {}
+    fn stopped(&mut self, _: &mut Self::Context) {
+        self.experiment_server.do_send(DisconnectServerMessage {
+            runner_id: self.runner_id
+        });
+    }
 }
 
 impl StreamHandler<Result<Message, ProtocolError>> for Session {

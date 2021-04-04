@@ -20,6 +20,12 @@ pub struct JoinServerMessage {
 
 #[derive(Message)]
 #[rtype(result = "()")]
+pub struct DisconnectServerMessage {
+    pub runner_id: ModelId,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
 pub struct RunResultMessage {
     pub runner_id: ModelId,
     pub job_id: ModelId,

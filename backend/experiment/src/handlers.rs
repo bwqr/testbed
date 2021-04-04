@@ -16,7 +16,7 @@ use core::types::{DBPool, DefaultResponse, ModelId};
 use core::utils::Hash;
 use user::models::user::User;
 
-use crate::connection::server::{ExperimentServer, RunExperimentMessage};
+use crate::connection::server::{ExperimentServer, RunExperiment};
 use crate::connection::session::Session;
 use crate::models::experiment::{Experiment, SLIM_EXPERIMENT_COLUMNS, SlimExperiment};
 use crate::models::job::{Job, JobStatus, SLIM_JOB_COLUMNS, SlimJob};
@@ -199,6 +199,7 @@ pub async fn run_experiment(
 ) -> DefaultResponse {
     let conn = pool.get().unwrap();
     let (experiment_id, runner_id) = ids.into_inner();
+    let user_id = user.id;
 
     let mut job = web::block(move || {
         let experiment = experiments::table
@@ -216,9 +217,12 @@ pub async fn run_experiment(
     })
         .await?;
 
-    let job_clone = job.clone();
     let job_id = job.id;
-    if let Err(e) = experiment_server.send(RunExperimentMessage { job: job_clone })
+    if let Err(e) = experiment_server.send(RunExperiment {
+        job_id,
+        runner_id,
+        user_id,
+    })
         .await {
         error!("Error while sending run to ExperimentServer: {:?}", e);
 
