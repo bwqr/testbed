@@ -21,31 +21,39 @@ class Encoder:
         pass
 
 
-class Action:
+class Command:
     pass
 
 
-class Emit(Action):
+class Emit(Command):
     def __init__(self, spray: Spray, duration: int):
         self.spray = spray
         self.duration = duration
 
 
-class Wait(Action):
+class Wait(Command):
     def __init__(self, duration: int):
         self.duration = duration
 
 
+class SetFanRPM(Command):
+    def __init__(self, rpm: int):
+        self.rpm = rpm
+
+
 class State:
     def __init__(self, encoder: Encoder):
-        self.actions = []
+        self.commands = []
         self.encoder = encoder
 
     def emit(self, spray: Spray, duration: int):
-        self.actions.append(Emit(spray, duration))
+        self.commands.append(Emit(spray, duration))
 
     def wait(self, duration: int):
-        self.actions.append(Wait(duration))
+        self.commands.append(Wait(duration))
+
+    def set_fan_rpm(self, rpm: int):
+        self.commands.append(SetFanRPM(rpm))
 
     def execute(self):
         print(self.encoder.encode(self))
@@ -56,18 +64,20 @@ class WordEncoder(Encoder):
 
     def encode(self, state: State) -> str:
         output = start_delimiter + '\n' + str(WordEncoder.id) + '\n'
-        for act in state.actions:
+        for act in state.commands:
             output += self._encode_action(act) + '\n'
 
         return output + 'end_delimiter'
 
-    def _encode_action(self, act: Action) -> str:
-        if isinstance(act, Emit):
-            return 'emit\n{}\n{}'.format(int(act.spray), act.duration)
-        elif isinstance(act, Wait):
-            return 'wait\n{}'.format(int(act.duration))
+    def _encode_action(self, cmd: Command) -> str:
+        if isinstance(cmd, Emit):
+            return 'emit\n{}\n{}'.format(int(cmd.spray), cmd.duration)
+        elif isinstance(cmd, Wait):
+            return 'wait\n{}'.format(int(cmd.duration))
+        elif isinstance(cmd, SetFanRPM):
+            return 'fan\n{}'.format(int(cmd.rpm))
         else:
-            print('unimplemented action {} for {} encoder'.format(act.__class__, self.__class__))
+            print('unimplemented action {} for {} encoder'.format(cmd.__class__, self.__class__))
             return ''
 
 
@@ -76,6 +86,7 @@ def run():
     pause_duration = 200  # ms
 
     state = State(WordEncoder())
+    state.set_fan_rpm(100)
     state.emit(Spray.Spray_1, spray_duration)
     state.wait(pause_duration)
     state.execute()
