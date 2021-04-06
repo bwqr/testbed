@@ -248,9 +248,7 @@ impl Handler<JoinServerMessage> for ExperimentServer {
                             });
 
                             // assign current running job
-                            if let Some(run_experiment) = experiments.1 {
-                                runner.active_run = Some(run_experiment);
-                            }
+                            runner.active_run = experiments.1;
 
                             // run a job if runner is idle and there is a pending job
                             if let None = runner.active_run {
