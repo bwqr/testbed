@@ -16,6 +16,19 @@ use crate::connection::messages::{DisconnectServerMessage, JoinServerMessage, Ru
 use crate::connection::session::Session;
 use crate::models::job::JobStatus;
 
+#[derive(PartialEq, Eq)]
+enum RunnerState {
+    Initializing,
+    Connected,
+}
+
+struct ConnectedRunner {
+    session: Addr<Session>,
+    active_run: Option<RunExperiment>,
+    queue: VecDeque<RunExperiment>,
+    state: RunnerState,
+}
+
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
 pub struct RunExperiment {
@@ -26,8 +39,7 @@ pub struct RunExperiment {
 
 pub struct ExperimentServer {
     pool: DBPool,
-    // run_id -> (runner session, running Run, pending Runs)
-    runners: HashMap<ModelId, (Addr<Session>, Option<RunExperiment>, VecDeque<RunExperiment>)>,
+    runners: HashMap<ModelId, ConnectedRunner>,
     notification: Addr<NotificationServer>,
 }
 
@@ -66,57 +78,59 @@ impl ExperimentServer {
             return;
         };
 
-        if let None = runner.1 {
-            // clone some necessary vars
-            let session = runner.0.clone();
-            let job_id = experiment.job_id;
-            let conn = self.pool.get().unwrap();
-
-            // set runner in progress
-            runner.1 = Some(experiment.clone());
-
-            // send experiment to the runner
-            async move {
-                let code = web::block(move || jobs::table.find(job_id).select(jobs::code).first::<String>(&conn))
-                    .await
-                    .map_err(|e| format!("{:?}", e))?;
-
-                session.send(RunMessage {
-                    job_id,
-                    // We have to decode the job.code in order to replace encoded html characters like '<' char
-                    code: core::decode_html(code.as_str()).unwrap(),
-                })
-                    .await
-                    .map_err(|e| format!("{:?}", e))?;
-
-                Ok(())
-            }
-                .into_actor(self)
-                .then(move |res: Result<(), String>, act, ctx| {
-                    let status = match res {
-                        Ok(_) => JobStatus::Running,
-                        Err(e) => {
-                            error!("Error while sending job to runner, {:?}", e);
-                            // TODO schedule another job
-                            JobStatus::Failed
-                        }
-                    };
-
-                    Self::send_status_notification(act.notification.clone(), experiment.user_id, experiment.job_id, status.clone())
-                        .into_actor(act)
-                        .spawn(ctx);
-
-                    Self::update_job(act.pool.get().unwrap(), experiment.job_id, status)
-                        .into_actor(act)
-                        .spawn(ctx);
-
-                    fut::ready(())
-                })
-                .spawn(ctx);
-        } else {
-            // if runner has a job, add job into pending queue
-            runner.2.push_back(experiment);
+        // check if runner is in initializing state or there are some active run, if so, push the experiment into queue
+        if runner.state == RunnerState::Initializing || runner.active_run.is_some() {
+            runner.queue.push_back(experiment);
+            return;
         }
+
+        // otherwise try to run experiment
+        // clone some necessary vars
+        let session = runner.session.clone();
+        let job_id = experiment.job_id;
+        let conn = self.pool.get().unwrap();
+
+        // set runner in progress
+        runner.active_run = Some(experiment.clone());
+
+        // send experiment to the runner
+        async move {
+            let code = web::block(move || jobs::table.find(job_id).select(jobs::code).first::<String>(&conn))
+                .await
+                .map_err(|e| format!("{:?}", e))?;
+
+            session.send(RunMessage {
+                job_id,
+                // We have to decode the code in order to replace encoded html characters like '<' char
+                code: core::decode_html(code.as_str()).unwrap(),
+            })
+                .await
+                .map_err(|e| format!("{:?}", e))?;
+
+            Ok(())
+        }
+            .into_actor(self)
+            .then(move |res: Result<(), String>, act, ctx| {
+                let status = match res {
+                    Ok(_) => JobStatus::Running,
+                    Err(e) => {
+                        error!("Error while sending job to runner, {:?}", e);
+                        // TODO schedule another job
+                        JobStatus::Failed
+                    }
+                };
+
+                Self::send_status_notification(act.notification.clone(), experiment.user_id, experiment.job_id, status.clone())
+                    .into_actor(act)
+                    .spawn(ctx);
+
+                Self::update_job(act.pool.get().unwrap(), experiment.job_id, status)
+                    .into_actor(act)
+                    .spawn(ctx);
+
+                fut::ready(())
+            })
+            .spawn(ctx);
     }
 
     async fn update_job(conn: PooledConnection<ConnectionManager<PgConnection>>, job_id: ModelId, status: JobStatus) {
@@ -173,47 +187,74 @@ impl Handler<JoinServerMessage> for ExperimentServer {
         let runner_id = msg.runner_id;
 
         // insert runner
-        self.runners.insert(msg.runner_id, (msg.addr, None, VecDeque::new()));
+        self.runners.insert(msg.runner_id, ConnectedRunner {
+            session: msg.addr,
+            active_run: None,
+            queue: VecDeque::new(),
+            state: RunnerState::Initializing,
+        });
 
-        // fetch pending jobs from database
+        // fetch pending jobs and ,if exist, running job from database
         let conn = self.pool.get().unwrap();
         async move {
             web::block(move || {
                 jobs::table
                     .inner_join(experiments::table)
                     .inner_join(runners::table)
-                    .filter(jobs::status.eq(JobStatus::Pending.value()))
+                    .filter(
+                        jobs::status.eq(JobStatus::Pending.value())
+                            .or(jobs::status.eq(JobStatus::Running.value()))
+                    )
                     .filter(runners::id.eq(runner_id))
-                    .select((jobs::id, experiments::user_id, runners::id))
-                    .load::<(ModelId, ModelId, ModelId)>(&conn)
+                    .select((jobs::id, jobs::status, experiments::user_id, runners::id))
+                    .load::<(ModelId, JobStatus, ModelId, ModelId)>(&conn)
                     .map(|experiments|
-                        experiments.into_iter().map(|t| RunExperiment {
-                            job_id: t.0,
-                            user_id: t.1,
-                            runner_id: t.2,
-                        }).collect()
+                        experiments.into_iter()
+                            // vec for pending jobs, option for if running job exist
+                            .fold::<(Vec<RunExperiment>, Option<RunExperiment>), _>((Vec::new(), None), |mut tuple, job| {
+                                let run_experiment = RunExperiment {
+                                    job_id: job.0,
+                                    user_id: job.2,
+                                    runner_id: job.3,
+                                };
+
+                                if job.1 == JobStatus::Running {
+                                    tuple.1 = Some(run_experiment);
+                                } else {
+                                    tuple.0.push(run_experiment);
+                                }
+
+                                tuple
+                            })
                     )
             })
                 .await
                 .map_err(|e| format!("{:?}", e))
         }
             .into_actor(self)
-            .then(move |res: Result<Vec<RunExperiment>, String>, act: _, ctx: _| {
+            .then(move |res: Result<(Vec<RunExperiment>, Option<RunExperiment>), String>, act: _, ctx: _| {
                 match res {
                     Ok(experiments) => {
                         // maybe runner disconnected, so check it
                         if let Some(runner) = act.runners.get_mut(&runner_id) {
+                            runner.state = RunnerState::Connected;
+
                             // push jobs into pending queue
-                            experiments.into_iter().for_each(|experiment| {
-                                // check if job is already pushed into queue
-                                if let None = runner.2.iter().find(|exp| exp.job_id == experiment.job_id) {
-                                    runner.2.push_back(experiment)
+                            experiments.0.into_iter().for_each(|experiment| {
+                                // check if job is already pushed into queue, since job can be sent to experiment server while we are fetching from database
+                                if let None = runner.queue.iter().find(|exp| exp.job_id == experiment.job_id) {
+                                    runner.queue.push_back(experiment)
                                 }
                             });
 
+                            // assign current running job
+                            if let Some(run_experiment) = experiments.1 {
+                                runner.active_run = Some(run_experiment);
+                            }
+
                             // run a job if runner is idle and there is a pending job
-                            if let None = runner.1 {
-                                if let Some(experiment) = runner.2.pop_front() {
+                            if let None = runner.active_run {
+                                if let Some(experiment) = runner.queue.pop_front() {
                                     act.run(experiment, ctx);
                                 }
                             }
@@ -243,15 +284,15 @@ impl Handler<RunResultMessage> for ExperimentServer {
         info!("got result {} id {}", msg.successful, msg.job_id);
 
         if let Some(runner) = self.runners.get_mut(&msg.runner_id) {
-            let correct_run = match &runner.1 {
+            let correct_run = match &runner.active_run {
                 Some(experiment) => experiment.job_id == msg.job_id,
                 None => false
             };
 
             // if runner is this one, mark it empty and if there is pending jobs, run it
             if correct_run {
-                runner.1 = None;
-                if let Some(experiment) = runner.2.pop_front() {
+                runner.active_run = None;
+                if let Some(experiment) = runner.queue.pop_front() {
                     self.run(experiment, ctx);
                 }
             }
