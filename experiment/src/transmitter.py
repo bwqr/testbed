@@ -1,4 +1,7 @@
+import time
 from enum import IntEnum
+
+from serial import Serial
 
 start_delimiter = 'start_delimiter'
 end_delimiter = 'end_delimiter'
@@ -55,19 +58,19 @@ class State:
     def set_fan_rpm(self, rpm: int):
         self.commands.append(SetFanRPM(rpm))
 
-    def execute(self):
-        print(self.encoder.encode(self))
+    def execute(self) -> str:
+        return self.encoder.encode(self)
 
 
 class WordEncoder(Encoder):
     id: int = int(Encoders.ByteEncoder)
 
     def encode(self, state: State) -> str:
-        output = start_delimiter + '\n' + str(WordEncoder.id) + '\n'
+        output = '\n' + start_delimiter + '\n'
         for act in state.commands:
             output += self._encode_action(act) + '\n'
 
-        return output + 'end_delimiter'
+        return output + 'end_delimiter\n'
 
     def _encode_action(self, cmd: Command) -> str:
         if isinstance(cmd, Emit):
@@ -82,14 +85,28 @@ class WordEncoder(Encoder):
 
 
 def run():
-    spray_duration = 100  # ms
-    pause_duration = 200  # ms
+    emit_duration = 500  # ms
+    wait_duration = 1000  # ms
 
     state = State(WordEncoder())
-    state.set_fan_rpm(100)
-    state.emit(Spray.Spray_1, spray_duration)
-    state.wait(pause_duration)
-    state.execute()
+    for i in range(0, 6):
+        state.wait(wait_duration)
+        state.emit(Spray.Spray_1, emit_duration)
+
+    state.wait(wait_duration)
+    state.emit(Spray.Spray_1, emit_duration)
+
+    output = state.execute()
+
+    with Serial('/dev/ttyUSB0', 9600) as ser:
+        # wait for a little time while Arduino resets
+        time.sleep(2)
+        ser.write(output.encode())
+        # for i in output:
+        #     print(i)
+        #     ser.write(i.encode())
+        # print(ser.read(30))
+        # time.sleep(0.01)
 
 
 if __name__ == '__main__':

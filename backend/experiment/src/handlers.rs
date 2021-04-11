@@ -106,6 +106,7 @@ pub async fn fetch_experiment_jobs(pool: web::Data<DBPool>, experiment_id: web::
         jobs::table
             .filter(jobs::experiment_id.eq(experiment.id))
             .inner_join(runners::table)
+            .order_by(jobs::id.desc())
             .select(((SLIM_JOB_COLUMNS, SLIM_RUNNER_COLUMNS), CountStarOver))
             .paginate(pagination.page)
             .per_page(pagination.per_page)
