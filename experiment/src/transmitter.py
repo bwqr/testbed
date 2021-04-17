@@ -59,7 +59,7 @@ class State:
         self.commands.append(SetFanRPM(rpm))
 
     def execute(self) -> str:
-        return self.encoder.encode(self)
+        print(self.encoder.encode(self))
 
 
 class WordEncoder(Encoder):
