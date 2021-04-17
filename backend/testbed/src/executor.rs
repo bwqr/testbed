@@ -1,4 +1,5 @@
 use std::io::{Read, Write};
+use std::process::Stdio;
 use std::time::Duration;
 
 use actix::prelude::*;
@@ -12,21 +13,31 @@ use crate::ModelId;
 const PYTHON_VERSION: &str = "3.9";
 const ALPINE_VERSION: &str = "3.13";
 
-const START_MESSAGE: &str = "arduino_avaiable";
+mod incoming {
+    pub const START_MESSAGE: &str = "arduino_avaiable";
+    pub const END_MESSAGE: &str = "end_of_experiment";
+}
+
+mod outgoing {
+    pub const ABORT_MESSAGE: &str = "abort_experiment\n";
+    pub const END_MESSAGE: &str = "end_of_experiment";
+}
 
 pub struct Executor {
     connection: Addr<Connection>,
     docker_path: String,
-    serial_path: String,
+    tx_dev_path: String,
+    rx_dev_path: String,
     python_lib_path: String,
 }
 
 impl Executor {
-    pub fn new(connection: Addr<Connection>, docker_path: String, serial_path: String, python_lib_path: String) -> Self {
+    pub fn new(connection: Addr<Connection>, docker_path: String, tx_dev_path: String, rx_dev_path: String, python_lib_path: String) -> Self {
         Executor {
             connection,
             docker_path,
-            serial_path,
+            tx_dev_path,
+            rx_dev_path,
             python_lib_path,
         }
     }
@@ -77,56 +88,41 @@ impl Executor {
             .map_err(|e| Error::String(e))
     }
 
-    fn start_receiver(&self, script_dir: &str) -> Result<String, Error> {
-        let (tx, rx) = std::sync::mpsc::channel();
-        let docker_path = self.docker_path.clone();
-        let python_lib_path = self.python_lib_path.clone();
-        let script_dir = String::from(script_dir);
-        std::thread::Builder::new().name(String::from("testbed-receiver")).spawn(move || {
-            tx.send(
-                std::process::Command::new(docker_path.as_str())
-                    .args(&["run", "--rm", "-e PYTHONDONTWRITEBYTECODE=1", "--device=/dev/ttyUSB0", "-p", "8011:8011"])
-                    .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", python_lib_path.as_str(), PYTHON_VERSION).as_str()])
-                    .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir.as_str()).as_str()])
-                    .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
-                    .args(&["python", "/usr/local/scripts/job.py", "--receiver"])
-                    .output()
-                    .map_err(|e| Error::IO(e))
-            )
-        }).map_err(|e| Error::IO(e))?;
-
-        std::thread::sleep(Duration::from_secs(10));
-
-        match std::net::TcpStream::connect("127.0.0.1:8011")
-            .map_err(|e| Error::Custom(String::from("Failed to connect tcp stream"))) {
-            Ok(mut tcp) => tcp.write("end_of_experiment".as_bytes())
-                .map_err(|e| Error::IO(e))?,
-            Err(e) => Err(e)?
-        };
-
-        let output = rx.recv().map_err(|e| Error::Custom(String::from("failed to receive from thread")))??;
-
-        if !output.status.success() {
-            // concatenate stdout and stderr
-            let mut err = String::from_utf8(output.stdout).map_err(|e| Error::String(e))?;
-            err += String::from_utf8(output.stderr).map_err(|e| Error::String(e))?.as_str();
-
-            return Err(Error::Output(err));
-        }
-
-        String::from_utf8(output.stdout)
-            .map_err(|e| Error::String(e))
+    fn start_receiver(&self, script_dir: &str) -> Result<std::process::Child, Error> {
+        std::process::Command::new(self.docker_path.as_str())
+            .args(&["run", "--rm", "-e PYTHONDONTWRITEBYTECODE=1", "-p", "8011:8011"])
+            .arg(format!("--device={}", self.rx_dev_path.as_str()))
+            .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
+            .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
+            .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
+            .args(&["python", "/usr/local/scripts/job.py", "--receiver", self.rx_dev_path.as_str()])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| Error::Custom(format!("Failed to spawn receiver process, {:?}", e)))
     }
 
     fn send_to_transmitter(&self, port: &mut serial::SystemPort, command_buffer: String) -> Result<(), Error> {
-        let mut buffer: Vec<u8> = Vec::with_capacity(START_MESSAGE.len());
+        let mut buffer = [0 as u8; incoming::START_MESSAGE.len()];
 
-        port.set_timeout(Duration::from_secs(5))
-            .map_err(|e| Error::Serial(e))?;
+        let mut error: Option<Error> = None;
 
         // read the START_MESSAGE message, we do not check if received buffer equals to START_MESSAGE since it is mostly equal.
-        port.read(buffer.as_mut_slice())
-            .map_err(|e| Error::IO(e))?;
+        // try 5 times to read a message
+        for _ in 0..5 {
+            match port.read(&mut buffer) {
+                Ok(_) => {
+                    error = None;
+                    break;
+                }
+                Err(e) => error = Some(Error::IO(e))
+            };
+        }
+
+        if let Some(error) = error {
+            return Err(error);
+        }
 
         port.write(command_buffer.as_bytes())
             .map_err(|e| Error::IO(e))?;
@@ -139,14 +135,68 @@ impl Executor {
 
         Self::create_dir_and_files(script_dir.as_str(), code)?;
 
-        // let command_buffer = self.run_transmitter_code(script_dir)?;
+        let command_buffer = self.run_transmitter_code(script_dir.as_str())?;
 
-        // let mut port = serial::open(self.serial_path.as_str())
-        //     .map_err(|e| Error::Serial(e))?;
+        let mut port = serial::open(self.tx_dev_path.as_str())
+            .map_err(|e| Error::Serial(e))?;
+        port.set_timeout(Duration::from_secs(1))
+            .map_err(|e| Error::Serial(e))?;
 
-        let output = self.start_receiver(script_dir.as_str())?;
+        let mut child = self.start_receiver(script_dir.as_str())?;
 
-        // self.send_to_transmitter(&mut port, command_buffer)?;
+        self.send_to_transmitter(&mut port, command_buffer)?;
+        let mut buff = [0 as u8; incoming::END_MESSAGE.len()];
+
+        let mut tx_success = false;
+        let mut child_exited = false;
+
+        loop {
+            // wait end of experiment message from transmitter
+            match port.read(&mut buff) {
+                Ok(_) => {
+                    if buff == incoming::END_MESSAGE.as_bytes() {
+                        tx_success = true;
+                        break;
+                    }
+                }
+                Err(e) => {
+                    match e.kind() {
+                        // ignore TimedOut error
+                        std::io::ErrorKind::TimedOut => {}
+                        e => error!("error while reading from tx device{:?}", e)
+                    }
+                }
+            }
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    child_exited = true;
+                    break;
+                }
+                Ok(None) => {}
+                Err(e) => {}
+            };
+        }
+
+        // if the loop did not exited with end of message, send abort experiment message to transmitter
+        if !tx_success {
+            port.write(outgoing::ABORT_MESSAGE.as_bytes())
+                .map_err(|e| Error::IO(e))?;
+        }
+
+        if !child_exited {
+            std::net::TcpStream::connect("127.0.0.1:8011")
+                .unwrap()
+                .write(outgoing::END_MESSAGE.as_bytes())
+                .unwrap();
+        }
+
+        // wait one minute until receiver exits
+
+        let mut output = String::new();
+        child.stdout.unwrap().read_to_string(&mut output)
+            .map_err(|e| Error::IO(e))?;
+        child.stderr.unwrap().read_to_string(&mut output)
+            .map_err(|e| Error::IO(e))?;
 
         self.remove_dir(script_dir.as_str())?;
 

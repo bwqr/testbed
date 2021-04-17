@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 use actix::dev::{MessageResponse, ResponseChannel};
 use actix::prelude::*;
 use actix_web_actors::ws::{Message as WebActorMessage, ProtocolError, WebsocketContext};
+use log::error;
 
 use core::types::ModelId;
 
@@ -35,8 +36,9 @@ impl Session {
 
     fn handle_msg(&mut self, msg: WebActorMessage, ctx: &mut <Self as Actor>::Context) -> Result<(), ErrorKind> {
         match msg {
-            WebActorMessage::Ping(_) => {
-                self.hb = Instant::now()
+            WebActorMessage::Ping(msg) => {
+                self.hb = Instant::now();
+                ctx.pong(&msg);
             }
             WebActorMessage::Pong(_) => {
                 self.hb = Instant::now()
@@ -122,7 +124,8 @@ impl StreamHandler<Result<WebActorMessage, ProtocolError>> for Session {
     fn handle(&mut self, msg: Result<WebActorMessage, ProtocolError>, ctx: &mut Self::Context) {
         let msg = match msg {
             Ok(m) => m,
-            Err(_) => {
+            Err(e) => {
+                error!("Protocol error, {:?}", e);
                 ctx.stop();
                 return;
             }
