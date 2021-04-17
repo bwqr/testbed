@@ -1,7 +1,8 @@
-from random import random
-from threading import Thread
-from typing import Union
 import socket
+import threading
+from random import random
+from typing import Union
+
 from serial import Serial
 
 start_message = 'arduino_available'
@@ -9,10 +10,32 @@ end_of_experiment = 'end_of_experiment'
 is_experiment_ended = False
 
 
+class Connection(threading.Thread):
+    def __init__(self, *args, **kwargs):
+        super(Connection, self).__init__(*args, **kwargs)
+
+    def run(self) -> None:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            global is_experiment_ended
+
+            sock.bind(('0.0.0.0', 8011))
+            sock.listen(1)
+            sock.settimeout(1)
+            # if main thread exited, terminate this thread
+            while threading.main_thread().is_alive():
+                try:
+                    conn, addr = sock.accept()
+                    with conn:
+                        conn.recv(len(end_of_experiment))
+                        is_experiment_ended = True
+                except socket.error:
+                    pass
+
+
 class Receiver:
     def __init__(self, device_path):
-        socket_thread = Thread(target=Receiver.__listen_event, name='socket-thread')
-        socket_thread.start()
+        self.connection = Connection(name='connection-thread')
+        self.connection.start()
         self.dev = Serial(device_path, 9600)
         self.dev.read(len(start_message))
 
@@ -26,30 +49,9 @@ class Receiver:
         else:
             return int(self.dev.read())
 
-    @staticmethod
-    def __listen_event():
-        # received = None
-        #
-        # while received != 'end_of_experiment':
-        #     received = input()
-        #
-        # global is_experiment_ended
-        # is_experiment_ended = True
-
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.bind(('0.0.0.0', 8011))
-            sock.listen(1)
-
-            global is_experiment_ended
-            conn, addr = sock.accept()
-            with conn:
-                print('Connected by', addr)
-                conn.recv(len(end_of_experiment))
-                is_experiment_ended = True
-
 
 def run():
-    receiver = Receiver()
+    receiver = Receiver('/dev/ttyUSB0')
 
     rx = receiver.next()
     while rx is not None:

@@ -1,5 +1,5 @@
 use std::io::{Read, Write};
-use std::process::Stdio;
+use std::process::{ExitStatus, Stdio};
 use std::time::Duration;
 
 use actix::prelude::*;
@@ -90,7 +90,7 @@ impl Executor {
 
     fn start_receiver(&self, script_dir: &str) -> Result<std::process::Child, Error> {
         std::process::Command::new(self.docker_path.as_str())
-            .args(&["run", "--rm", "-e PYTHONDONTWRITEBYTECODE=1", "-p", "8011:8011"])
+            .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1", "-p", "8011:8011"])
             .arg(format!("--device={}", self.rx_dev_path.as_str()))
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
@@ -103,7 +103,12 @@ impl Executor {
             .map_err(|e| Error::Custom(format!("Failed to spawn receiver process, {:?}", e)))
     }
 
-    fn send_to_transmitter(&self, port: &mut serial::SystemPort, command_buffer: String) -> Result<(), Error> {
+    fn start_transmitter(&self) -> Result<serial::SystemPort, Error> {
+        let mut port = serial::open(self.tx_dev_path.as_str())
+            .map_err(|e| Error::Serial(e))?;
+        port.set_timeout(Duration::from_secs(1))
+            .map_err(|e| Error::Serial(e))?;
+
         let mut buffer = [0 as u8; incoming::START_MESSAGE.len()];
 
         let mut error: Option<Error> = None;
@@ -124,10 +129,46 @@ impl Executor {
             return Err(error);
         }
 
-        port.write(command_buffer.as_bytes())
-            .map_err(|e| Error::IO(e))?;
+        Ok(port)
+    }
 
-        Ok(())
+    fn send_to_transmitter(&self, port: &mut serial::SystemPort, command_buffer: String) -> Result<(), Error> {
+        port.write(command_buffer.as_bytes())
+            .map(|_| ())
+            .map_err(|e| Error::IO(e))
+    }
+
+    fn wait_loop(&self, port: &mut serial::SystemPort, child: &mut std::process::Child) -> Result<ExitReason, Error> {
+        let mut buff = [0 as u8; incoming::END_MESSAGE.len()];
+
+        let mut exit_reason: Option<ExitReason> = None;
+
+        while exit_reason.is_none() {
+            match port.read(&mut buff) {
+                Ok(_) => {
+                    if buff == incoming::END_MESSAGE.as_bytes() {
+                        exit_reason = Some(ExitReason::EndOfExperiment);
+                    }
+                }
+                Err(e) => {
+                    match e.kind() {
+                        // ignore TimedOut error
+                        std::io::ErrorKind::TimedOut => {}
+                        e => return Err(Error::IO(std::io::Error::from(e)))
+                    }
+                }
+            }
+
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    exit_reason = Some(ExitReason::ChildExit(status));
+                }
+                Ok(None) => {}
+                Err(e) => error!("Error while trying to wait for child, {:?}", e)
+            };
+        }
+        // end of experiment is default exit reason
+        Ok(exit_reason.unwrap_or(ExitReason::EndOfExperiment))
     }
 
     fn handle_execution(&self, job_id: ModelId, code: String) -> Result<String, Error> {
@@ -137,65 +178,85 @@ impl Executor {
 
         let command_buffer = self.run_transmitter_code(script_dir.as_str())?;
 
-        let mut port = serial::open(self.tx_dev_path.as_str())
-            .map_err(|e| Error::Serial(e))?;
-        port.set_timeout(Duration::from_secs(1))
-            .map_err(|e| Error::Serial(e))?;
+        let mut port = self.start_transmitter()?;
 
         let mut child = self.start_receiver(script_dir.as_str())?;
 
         self.send_to_transmitter(&mut port, command_buffer)?;
-        let mut buff = [0 as u8; incoming::END_MESSAGE.len()];
 
-        let mut tx_success = false;
-        let mut child_exited = false;
+        match self.wait_loop(&mut port, &mut child) {
+            Ok(exit_reason) => {
+                match exit_reason {
+                    ExitReason::EndOfExperiment => {
+                        std::net::TcpStream::connect("127.0.0.1:8011")
+                            .map_err(|e| Error::IO(e))?
+                            .write(outgoing::END_MESSAGE.as_bytes())
+                            .map_err(|e| Error::IO(e))?;
 
-        loop {
-            // wait end of experiment message from transmitter
-            match port.read(&mut buff) {
-                Ok(_) => {
-                    if buff == incoming::END_MESSAGE.as_bytes() {
-                        tx_success = true;
-                        break;
+                        // wait 10 second until receiver code exits
+                        let mut exited = false;
+                        for _ in 0..10 {
+                            match child.try_wait() {
+                                Ok(Some(status)) => {
+                                    exited = true;
+
+                                    if !status.success() {
+                                        // if not successful, gather the outputs
+                                        let mut output = String::new();
+                                        child.stdout.unwrap().read_to_string(&mut output)
+                                            .map_err(|e| Error::IO(e))?;
+                                        child.stderr.unwrap().read_to_string(&mut output)
+                                            .map_err(|e| Error::IO(e))?;
+
+                                        return Err(Error::Output(output));
+                                    }
+
+                                    break;
+                                }
+                                Ok(None) => {}
+                                Err(e) => return Err(Error::IO(e))
+                            }
+
+                            std::thread::sleep(Duration::from_secs(1));
+                        }
+
+                        if !exited {
+                            let _ = child.kill();
+                            return Err(Error::Custom(String::from("receiver code did not exit in 10 seconds")));
+                        }
                     }
-                }
-                Err(e) => {
-                    match e.kind() {
-                        // ignore TimedOut error
-                        std::io::ErrorKind::TimedOut => {}
-                        e => error!("error while reading from tx device{:?}", e)
+                    ExitReason::ChildExit(status) => {
+                        port.write(outgoing::ABORT_MESSAGE.as_bytes())
+                            .map_err(|e| Error::IO(e))?;
+
+                        // user receiver code should not exit until receiving an END_MESSAGE over tcp
+                        if status.success() {
+                            return Err(Error::Custom(String::from("User receiver code exited successfully without waiting end of experiment, this should not be the case")));
+                        }
+
+                        // if not successful, gather the outputs
+                        let mut output = String::new();
+                        child.stdout.unwrap().read_to_string(&mut output)
+                            .map_err(|e| Error::IO(e))?;
+                        child.stderr.unwrap().read_to_string(&mut output)
+                            .map_err(|e| Error::IO(e))?;
+
+                        return Err(Error::Output(output));
                     }
                 }
             }
-            match child.try_wait() {
-                Ok(Some(status)) => {
-                    child_exited = true;
-                    break;
-                }
-                Ok(None) => {}
-                Err(e) => {}
-            };
+            Err(e) => {
+                // just kill everything without checking error and return error
+                let _ = port.write(outgoing::ABORT_MESSAGE.as_bytes());
+                let _ = child.kill();
+
+                return Err(e);
+            }
         }
 
-        // if the loop did not exited with end of message, send abort experiment message to transmitter
-        if !tx_success {
-            port.write(outgoing::ABORT_MESSAGE.as_bytes())
-                .map_err(|e| Error::IO(e))?;
-        }
-
-        if !child_exited {
-            std::net::TcpStream::connect("127.0.0.1:8011")
-                .unwrap()
-                .write(outgoing::END_MESSAGE.as_bytes())
-                .unwrap();
-        }
-
-        // wait one minute until receiver exits
-
+        // if not successful, gather the outputs
         let mut output = String::new();
         child.stdout.unwrap().read_to_string(&mut output)
-            .map_err(|e| Error::IO(e))?;
-        child.stderr.unwrap().read_to_string(&mut output)
             .map_err(|e| Error::IO(e))?;
 
         self.remove_dir(script_dir.as_str())?;
@@ -212,8 +273,6 @@ impl Handler<RunMessage> for Executor {
     type Result = ();
 
     fn handle(&mut self, msg: RunMessage, ctx: &mut Self::Context) {
-        info!("got some run for Executor, id: {}, code: {}", msg.job_id, msg.code);
-
         let job_id = msg.job_id;
 
         let addr = self.connection.clone();
@@ -221,11 +280,10 @@ impl Handler<RunMessage> for Executor {
         let (output, successful) = match self.handle_execution(msg.job_id, msg.code) {
             Ok(output) => (output, true),
             Err(e) => {
-                error!("could not execute the job, {:?}", e);
                 // just try to remove script files, even error originated from remove_script_files, we should try it.
                 let _ = self.remove_dir(Self::gen_tmp_dir(job_id).as_str());
 
-                (e.to_string(), false)
+                (format!("{:?}", e), false)
             }
         };
 
@@ -241,7 +299,7 @@ impl Handler<RunMessage> for Executor {
 }
 
 #[derive(Debug)]
-pub enum Error {
+enum Error {
     IO(std::io::Error),
     Serial(serial::Error),
     String(std::string::FromUtf8Error),
@@ -249,14 +307,7 @@ pub enum Error {
     Custom(String),
 }
 
-impl Error {
-    pub fn to_string(self) -> String {
-        match self {
-            Error::IO(io) => format!("{:?}", io),
-            Error::String(utf8) => format!("{:?}", utf8),
-            Error::Output(output) => output,
-            Error::Serial(serial) => format!("{:?}", serial),
-            Error::Custom(message) => format!("Custom {:?}", message),
-        }
-    }
+enum ExitReason {
+    EndOfExperiment,
+    ChildExit(ExitStatus),
 }
