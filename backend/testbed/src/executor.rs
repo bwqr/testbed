@@ -3,7 +3,7 @@ use std::process::{ExitStatus, Stdio};
 use std::time::Duration;
 
 use actix::prelude::*;
-use log::{error, info};
+use log::error;
 use serial::core::SerialDevice;
 
 use crate::connection::Connection;
@@ -14,7 +14,7 @@ const PYTHON_VERSION: &str = "3.9";
 const ALPINE_VERSION: &str = "3.13";
 
 mod incoming {
-    pub const START_MESSAGE: &str = "arduino_avaiable";
+    pub const SETUP_MESSAGE: &str = "arduino_available";
     pub const END_MESSAGE: &str = "end_of_experiment";
 }
 
@@ -68,10 +68,10 @@ impl Executor {
 
     fn run_transmitter_code(&self, script_dir: &str) -> Result<String, Error> {
         let output = std::process::Command::new(self.docker_path.as_str())
-            .args(&["run", "--rm", "-e PYTHONDONTWRITEBYTECODE=1"])
+            .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1"])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
-            .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
+            .arg(format!("python:{}", PYTHON_VERSION).as_str())
             .args(&["python", "/usr/local/scripts/job.py", "--transmitter"])
             .output()
             .map_err(|e| Error::IO(e))?;
@@ -94,7 +94,7 @@ impl Executor {
             .arg(format!("--device={}", self.rx_dev_path.as_str()))
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
-            .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
+            .arg(format!("python:{}", PYTHON_VERSION).as_str())
             .args(&["python", "/usr/local/scripts/job.py", "--receiver", self.rx_dev_path.as_str()])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -109,7 +109,7 @@ impl Executor {
         port.set_timeout(Duration::from_secs(1))
             .map_err(|e| Error::Serial(e))?;
 
-        let mut buffer = [0 as u8; incoming::START_MESSAGE.len()];
+        let mut buffer = [0 as u8; incoming::SETUP_MESSAGE.len()];
 
         let mut error: Option<Error> = None;
 
@@ -138,7 +138,7 @@ impl Executor {
             .map_err(|e| Error::IO(e))
     }
 
-    fn wait_loop(&self, port: &mut serial::SystemPort, child: &mut std::process::Child) -> Result<ExitReason, Error> {
+    fn wait_exit(&self, port: &mut serial::SystemPort, child: &mut std::process::Child) -> Result<ExitReason, Error> {
         let mut buff = [0 as u8; incoming::END_MESSAGE.len()];
 
         let mut exit_reason: Option<ExitReason> = None;
@@ -184,14 +184,20 @@ impl Executor {
 
         self.send_to_transmitter(&mut port, command_buffer)?;
 
-        match self.wait_loop(&mut port, &mut child) {
+        match self.wait_exit(&mut port, &mut child) {
             Ok(exit_reason) => {
                 match exit_reason {
                     ExitReason::EndOfExperiment => {
                         std::net::TcpStream::connect("127.0.0.1:8011")
-                            .map_err(|e| Error::IO(e))?
+                            .map_err(|_| {
+                                let _ = child.kill();
+                                Error::Custom(String::from("Failed to connect receiver code over tcp"))
+                            })?
                             .write(outgoing::END_MESSAGE.as_bytes())
-                            .map_err(|e| Error::IO(e))?;
+                            .map_err(|_| {
+                                let _ = child.kill();
+                                Error::Custom(String::from("Failed to send END_MESSAGE to receiver code"))
+                            })?;
 
                         // wait 10 second until receiver code exits
                         let mut exited = false;
@@ -200,8 +206,8 @@ impl Executor {
                                 Ok(Some(status)) => {
                                     exited = true;
 
+                                    // if not successful, gather the outputs
                                     if !status.success() {
-                                        // if not successful, gather the outputs
                                         let mut output = String::new();
                                         child.stdout.unwrap().read_to_string(&mut output)
                                             .map_err(|e| Error::IO(e))?;
@@ -254,7 +260,6 @@ impl Executor {
             }
         }
 
-        // if not successful, gather the outputs
         let mut output = String::new();
         child.stdout.unwrap().read_to_string(&mut output)
             .map_err(|e| Error::IO(e))?;
