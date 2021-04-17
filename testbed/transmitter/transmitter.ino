@@ -36,10 +36,14 @@ struct SetFanRPM : Command {
 #define MAX_NUM_COMMAND 200
 
 struct State {
-    void execute() {
-        for (int i = 0; i < this->len; i++) {
-            this->commands[i]->run();
-        }
+    Command * next() {
+      if (this->current_command_index < this->len) {
+        auto clone = this->current_command_index;
+        this->current_command_index += 1;
+        return this->commands[clone];
+      } else {
+        return nullptr;
+      }
     }
 
     void addCommand(Command *command) {
@@ -54,11 +58,13 @@ struct State {
             delete this->commands[i];
         }
 
+        this->current_command_index = 0;
         this->len = 0;
     }
 
 private:
     Command *commands[MAX_NUM_COMMAND];
+    int current_command_index;
     int len;
 };
 
@@ -130,6 +136,14 @@ struct StreamDecoder {
         }
     }
 
+    void reset() {
+      this->decodingCommand = None;
+      this->stage = 0;
+      if (this->command) {
+        delete this->command;
+      }
+    }
+
 private:
     DecodingCommand decodingCommand;
     int stage;
@@ -144,8 +158,17 @@ private:
     }
 };
 
-const char * startDelimiter = "start_delimiter";
-const char *endDelimiter = "end_delimiter";
+namespace outgoing {
+    const char * setupMessage = "arduino_available";
+    const char * endOfExperiment = "end_of_experiment";  
+}
+
+namespace incoming {
+    const char * startDelimiter = "start_delimiter";
+    const char * endDelimiter = "end_delimiter";
+    const char * abortExperiment = "abort_experiment";  
+}
+
 
 bool beginDecoding = false;
 bool lineCompleted = false;
@@ -158,17 +181,25 @@ void setup() {
   Serial.begin(9600);
 
   pinMode(LED_BUILTIN, OUTPUT);
+
+  Serial.print(outgoing::setupMessage);
 }
 
 void loop() {
     if (lineCompleted) {
-        if (!beginDecoding && line == startDelimiter) {
+        if (line == incoming::abortExperiment) {
+            reset();
+            return;
+        }
+        
+        if (!beginDecoding && line == incoming::startDelimiter) {
             beginDecoding = true;
         }
 
-        if (beginDecoding && line == endDelimiter) {
+        if (beginDecoding && line == incoming::endDelimiter) {
             beginDecoding = false;
             runExperiment = true;
+            decoder.reset();
         }
 
         if (beginDecoding) {
@@ -183,10 +214,25 @@ void loop() {
     }
 
     if (runExperiment) {
-        state.execute();
-        state.reset();
-        runExperiment = false;
+        auto command = state.next();
+
+        if (command != nullptr) {
+          command->run(); 
+        } else { // end of experiment
+          Serial.print(outgoing::endOfExperiment);
+          reset();
+          return;
+        }
     }
+}
+
+void reset() {
+    state.reset();
+    decoder.reset();
+    beginDecoding = false;
+    runExperiment = false;
+    lineCompleted = false;
+    line = "";
 }
 
 void serialEvent() {
