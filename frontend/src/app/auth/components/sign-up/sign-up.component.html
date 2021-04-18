@@ -1,40 +1,40 @@
-<div>
-  <div class="mb-4">
-    <h1 class="title">Sign Up</h1>
-  </div>
-  <app-error-message [errorMessage]="errorMessage" *ngIf="errorMessage"></app-error-message>
-  <form [formGroup]="formGroup" (ngSubmit)="signUp(formGroup.value)">
-
-    <div class="nes-field mb-4">
-      <label for="first-name">Your name</label>
-      <input id="first-name" class="nes-input" type="text" formControlName="firstName" placeholder="First name"
-             appFormValidity>
-    </div>
-
-    <div class="nes-field mb-4">
-      <label for="last-name">Last name</label>
-      <input id="last-name" class="nes-input" type="text" formControlName="lastName" placeholder="Last name"
-             appFormValidity>
-    </div>
-
-    <div class="nes-field mb-4">
-      <label for="email">Email</label>
-      <input id="email" class="nes-input" type="email" formControlName="email" placeholder="Email" appFormValidity>
-    </div>
-
-    <div class="nes-field mb-4">
-      <label for="password">Password</label>
-      <input id="password" class="nes-input" type="password" formControlName="password" placeholder="Password"
-             appFormValidity>
-    </div>
-
-    <div class="nes-field mb-3">
-      <small>Already have an account? <a routerLink="/auth/login">Login</a>.</small>
-    </div>
-
-    <div class="nes-field">
-      <button class="nes-btn is-primary w-100" type="submit" [disabled]="!formGroup.valid || isInProcessingState">Login
-      </button>
-    </div>
-  </form>
+<div class="mb-4">
+  <p class="fs-2 text-center">Sign Up</p>
 </div>
+
+<app-error-message [errorMessage]="errorMessage" *ngIf="errorMessage"></app-error-message>
+
+<form [formGroup]="formGroup" (ngSubmit)="signUp(formGroup.value)">
+  <div class="mb-3">
+    <label for="first-name">Your name</label>
+    <input id="first-name" class="form-control" type="text" formControlName="firstName" placeholder="First name"
+           appFormValidity>
+  </div>
+
+  <div class="mb-3">
+    <label for="last-name">Last name</label>
+    <input id="last-name" class="form-control" type="text" formControlName="lastName" placeholder="Last name"
+           appFormValidity>
+  </div>
+
+  <div class="mb-3">
+    <label for="email">Email</label>
+    <input id="email" class="form-control" type="email" formControlName="email" placeholder="Email" appFormValidity>
+  </div>
+
+  <div class="mb-3">
+    <label for="password">Password</label>
+    <input id="password" class="form-control" type="password" formControlName="password" placeholder="Password"
+           appFormValidity>
+  </div>
+
+  <div class="mb-3">
+    <small>Already have an account? <a routerLink="/auth/login">Login</a>.</small>
+  </div>
+
+  <div class="mb-3">
+    <button class="w-100 btn btn-dark" type="submit" [disabled]="!formGroup.valid || isInProcessingState">
+      Sign up
+    </button>
+  </div>
+</form>

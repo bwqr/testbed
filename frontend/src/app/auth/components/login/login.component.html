@@ -1,33 +1,31 @@
-<div>
-  <div class="mb-4">
-    <h1 class="title">Login</h1>
+<div class="mb-4">
+  <p class="fs-2 text-center">Login</p>
+</div>
+
+<app-error-message [errorMessage]="errorMessage" *ngIf="errorMessage"></app-error-message>
+
+<form [formGroup]="formGroup" (ngSubmit)="login(formGroup.value)">
+  <div class="mb-3">
+    <label for="email">Email</label>
+    <input id="email" class="form-control" type="email" formControlName="email" placeholder="Email" appFormValidity>
+  </div>
+  <div class="mb-3">
+    <label for="password">Password</label>
+    <input id="password" class="form-control" type="password" formControlName="password" placeholder="Password"
+           appFormValidity>
   </div>
 
-  <app-error-message [errorMessage]="errorMessage" *ngIf="errorMessage"></app-error-message>
+  <div class="mb-3">
+    <small>Don't have an account? <a routerLink="/auth/sign-up">Sign up</a>.</small>
+  </div>
 
-  <form [formGroup]="formGroup" (ngSubmit)="login(formGroup.value)">
-    <div class="nes-field mb-4">
-      <label for="email">Email</label>
-      <input id="email" class="nes-input" type="email" formControlName="email" placeholder="Email" appFormValidity>
-    </div>
-    <div class="nes-field mb-4">
-      <label for="password">Password</label>
-      <input id="password" class="nes-input" type="password" formControlName="password" placeholder="Password"
-             appFormValidity>
-    </div>
+  <div class="mb-3">
+    <small>Don't remember password? <a routerLink="/auth/forgot-password">Reset your password</a>.</small>
+  </div>
 
-    <div class="nes-field mb-3">
-      <small>Don't have an account? <a routerLink="/auth/sign-up">Sign up</a>.</small>
-    </div>
-
-    <div class="nes-field mb-3">
-      <small>Don't remember password? <a routerLink="/auth/forgot-password">Reset your password</a>.</small>
-    </div>
-
-    <div class="nes-field">
-      <button class="nes-btn is-primary w-100" type="submit"
-              [disabled]="!formGroup.valid || isInProcessingState">Login
-      </button>
-    </div>
-  </form>
-</div>
+  <div class="mb-3">
+    <button class="w-100 btn btn-dark" type="submit" [disabled]="!formGroup.valid || isInProcessingState">
+      Login
+    </button>
+  </div>
+</form>

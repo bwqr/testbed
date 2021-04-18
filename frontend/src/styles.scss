@@ -1,22 +1,22 @@
 /* You can add global styles to this file, and also import other style files */
+
+// Configuration
 @import '~bootstrap/scss/functions';
-@import '~bootstrap/scss/vendor/_rfs';
 @import '~bootstrap/scss/variables';
-@import '~bootstrap/scss/mixins/_hover';
-@import '~bootstrap/scss/mixins/_border-radius';
-@import '~bootstrap/scss/mixins/_transition';
-@import '~bootstrap/scss/transitions';
-@import '~bootstrap/scss/bootstrap-grid';
-@import '~bootstrap/scss/navbar';
-@import '~nes.css/css/nes.min.css';
+@import '~bootstrap/scss/mixins';
+@import '~bootstrap/scss/utilities';
+//
+//@import '~bootstrap/scss/navbar';
+//@import '~bootstrap/scss/containers';
+//@import '~bootstrap/scss/grid';
+
+@import '~bootstrap/dist/css/bootstrap.css';
+
 @import '~codemirror/lib/codemirror.css';
 
 html, body {
   min-height: 100vh;
-}
-
-.w-100 {
-  width: 100%;
+  background-color: #f5f5fa;
 }
 
 .CodeMirror {
