@@ -1,20 +1,25 @@
 <div class="container mt-4">
   <div class="mb-4">
-    <h2 class="title">Create a new experiment</h2>
+    <p class="fs-3">New Experiment</p>
     <hr>
   </div>
-  <div class="row">
-    <div class="col-md-4 offset-md-4">
-      <form (ngSubmit)="storeExperiment(formGroup.value)" [formGroup]="formGroup">
-        <app-error-message [errorMessage]="errorMessage" *ngIf="errorMessage"></app-error-message>
-        <div class="nes-field mb-4">
-          <label for="experiment-name">Experiment Name</label>
-          <input id="experiment-name" class="nes-input" type="text" formControlName="name" placeholder="Name"/>
-        </div>
-        <div class="nes-field">
-          <button class="nes-btn is-primary w-100" type="submit">Create</button>
-        </div>
-      </form>
+  <div class="bg-white rounded-3 shadow-sm p-md-5 p-3">
+    <div class="row">
+      <div class="col-4">
+        <p class="text-secondary">Create a new experiment</p>
+      </div>
+      <div class="col-4">
+        <form (ngSubmit)="storeExperiment(formGroup.value)" [formGroup]="formGroup">
+          <app-error-message [errorMessage]="errorMessage" *ngIf="errorMessage"></app-error-message>
+          <div class="mb-3">
+            <label for="experiment-name">Experiment Name</label>
+            <input id="experiment-name" class="form-control" type="text" formControlName="name" placeholder="Name"/>
+          </div>
+          <div class="mb-3">
+            <button class="w-100 btn btn-primary" type="submit">Create</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </div>

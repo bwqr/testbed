@@ -1,20 +1,43 @@
 <div class="container mt-4">
-  <div class="mb-5">
-    <h2 class="title">Job</h2>
+  <div class="mb-4">
+    <p class="fs-3">Job</p>
     <hr>
   </div>
 
-  <div *ngIf="job">
-    <ul>
-      <li>{{job.id}}</li>
-      <li>{{job.experimentId}}</li>
-      <li>{{job.runnerId}}</li>
-      <li>{{runner.name}}</li>
-      <li>{{job.code}}</li>
-      <li>{{job.output || ''}}</li>
-      <li>{{job.status}}</li>
-      <li>{{job.createdAt}}</li>
-      <li>{{job.updatedAt}}</li>
-    </ul>
+  <div class="bg-white rounded-3 shadow-sm p-md-5 p-3">
+    <table class="table table-hover table-borderless table-responsive-sm mb-4">
+      <thead>
+      <tr>
+        <th>Id</th>
+        <th>Runner</th>
+        <th>Status</th>
+        <th>Created at</th>
+        <th>Last updated at</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr *ngIf="isPageReady">
+        <td>{{job.id}}</td>
+        <td>{{runner.name}}</td>
+        <td>{{job.status}}</td>
+        <td>{{job.createdAt | date : formats.shortDate}}</td>
+        <td>{{job.updatedAt | date : formats.shortDate}}</td>
+      </tr>
+      </tbody>
+    </table>
+
+    <div class="row">
+      <div class="col-xl-8">
+        <h1 class="fs-4">Code</h1>
+        <hr>
+        <div #code></div>
+      </div>
+      <div class="col" *ngIf="isPageReady">
+        <h1 class="fs-4">Output</h1>
+        <hr>
+        {{job.output}}
+      </div>
+    </div>
+
   </div>
 </div>

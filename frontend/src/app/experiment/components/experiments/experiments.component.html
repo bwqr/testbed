@@ -1,19 +1,20 @@
 <div class="container mt-4">
   <div class="mb-4">
-    <h2 class="title">Experiments</h2>
+    <p class="fs-3">Experiments</p>
     <hr>
   </div>
   <div class="d-flex justify-content-end mb-4">
-    <a class="nes-btn is-primary" routerLink="../add">Create Experiment</a>
+    <a class="btn btn-primary" routerLink="../add">Create Experiment</a>
   </div>
-  <div class="nes-table-responsive d-flex justify-content-center align-items-center">
-    <table class="nes-table is-bordered" *ngIf="experiments">
+
+  <div class="bg-white rounded-3 shadow-sm p-md-5 p-3" *ngIf="isPageReady">
+    <table class="table table-hover table-responsive-sm mb-4">
       <thead>
       <tr>
         <th>Id</th>
         <th>Name</th>
         <th>Created at</th>
-        <th>Last update at</th>
+        <th>Last updated at</th>
         <th></th>
       </tr>
       </thead>
@@ -21,15 +22,27 @@
       <tr *ngFor="let experiment of experiments.items">
         <td><small>{{experiment.id}}</small></td>
         <td><small>{{experiment.name}}</small></td>
-        <td><small>{{experiment.createdAt}}</small></td>
-        <td><small>{{experiment.updatedAt}}</small></td>
+        <td><small>{{experiment.createdAt | date : formats.shortDate}}</small></td>
+        <td><small>{{experiment.updatedAt | date : formats.shortDate}}</small></td>
         <td>
-          <a class="nes-btn is-primary" [routerLink]="['../experiment', experiment.id]">
+          <a class="btn btn-outline-dark" [routerLink]="['../experiment', experiment.id]">
             <small>Details</small>
           </a>
         </td>
       </tr>
       </tbody>
     </table>
+
+    <nav class="d-flex justify-content-end">
+      <p class="me-4 text-secondary">
+        total {{experiments.totalItems}} items
+      </p>
+      <ul class="pagination pagination-sm">
+        <li class="page-item" [ngClass]="{'active': page === experiments.currentPage}"
+            *ngFor="let page of paginationRange">
+          <a class="page-link" routerLink="./" [queryParams]="{'page': page}" queryParamsHandling="merge">{{page}}</a>
+        </li>
+      </ul>
+    </nav>
   </div>
 </div>

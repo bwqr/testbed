@@ -4,18 +4,17 @@ import {ExperimentViewModelService} from '../../services/experiment-view-model.s
 import {Experiment, JobUpdate, SlimJob, SlimRunner} from '../../models';
 import {ActivatedRoute} from '@angular/router';
 import {filter, finalize, map, switchMap} from 'rxjs/operators';
-import CodeMirror from 'codemirror';
-import * as python from 'codemirror/mode/python/python.js';
 import {MainService} from '../../../core/services/main.service';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 import {combineLatest} from 'rxjs';
 import {Pagination} from '../../../core/models';
 import {WebSocketService} from '../../../core/services/web-socket.service';
 import {NotificationKind} from '../../../core/websocket/models';
+import {basicSetup, EditorState, EditorView} from '@codemirror/basic-setup';
+import {python} from '@codemirror/lang-python';
+import {keymap} from '@codemirror/view';
+import {defaultTabBinding} from '@codemirror/commands';
 
-// This expression is required since we want python to be imported and included in output of webpack
-// tslint:disable-next-line:no-unused-expression
-python;
 
 @Component({
   selector: 'app-experiment',
@@ -32,7 +31,7 @@ export class ExperimentComponent extends MainComponent implements OnInit {
 
   @ViewChild('code') code: ElementRef;
 
-  codeMirror: any;
+  editor: EditorView;
 
   formGroup: FormGroup;
 
@@ -85,17 +84,18 @@ export class ExperimentComponent extends MainComponent implements OnInit {
         el.innerHTML = this.experiment.code;
         const renderedCode = el.textContent;
 
-        this.codeMirror = CodeMirror((elt) => {
-          // remove all of the children https://stackoverflow.com/questions/3955229/remove-all-child-elements-of-a-dom-node-in-javascript
-          this.code.nativeElement.textContent = '';
-          // append our codemirror
-          this.code.nativeElement.appendChild(elt);
-        }, {
-          value: renderedCode,
-          mode: 'python',
-          lineNumbers: true,
-          lineWiseCopyCut: true,
-          indentUnit: 4
+        // experiment.code is html encoded, we need to decode it
+        this.editor = new EditorView({
+          state: EditorState.create({
+            doc: renderedCode,
+            extensions: [
+              basicSetup,
+              python(),
+              // EditorState.tabSize.of(4),
+              keymap.of([defaultTabBinding])
+            ]
+          }),
+          parent: this.code.nativeElement
         });
       })
     );
@@ -104,8 +104,11 @@ export class ExperimentComponent extends MainComponent implements OnInit {
   saveExperiment(): void {
     this.enterProcessingState();
 
+    // server expects indentations to be 4 spaces, not tabs. We replace any tabs with four spaces.
+    const code = this.editor.state.doc.toString().replace('\t', '    ');
+
     this.subs.add(
-      this.viewModel.updateExperiment(this.experiment.id, this.codeMirror.getValue()).pipe(
+      this.viewModel.updateExperiment(this.experiment.id, code).pipe(
         finalize(() => this.leaveProcessingState())
       )
         .subscribe(_ => this.service.alertSuccess('Experiment is updated.'))
@@ -123,6 +126,7 @@ export class ExperimentComponent extends MainComponent implements OnInit {
         .subscribe(job => {
           this.jobs.items.unshift([job, runner]);
           this.service.alertSuccess('Experiment is queued to run');
+          this.formGroup.reset({runnerId: ''});
         })
     );
   }

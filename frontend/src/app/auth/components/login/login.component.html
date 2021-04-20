@@ -2,8 +2,6 @@
   <p class="fs-2 text-center">Login</p>
 </div>
 
-<app-error-message [errorMessage]="errorMessage" *ngIf="errorMessage"></app-error-message>
-
 <form [formGroup]="formGroup" (ngSubmit)="login(formGroup.value)">
   <div class="mb-3">
     <label for="email">Email</label>
@@ -15,6 +13,10 @@
            appFormValidity>
   </div>
 
+  <div class="mb-3" *ngIf="errorMessage">
+    <app-error-message [errorMessage]="errorMessage"></app-error-message>
+  </div>
+
   <div class="mb-3">
     <small>Don't have an account? <a routerLink="/auth/sign-up">Sign up</a>.</small>
   </div>
@@ -24,7 +26,7 @@
   </div>
 
   <div class="mb-3">
-    <button class="w-100 btn btn-dark" type="submit" [disabled]="!formGroup.valid || isInProcessingState">
+    <button class="w-100 btn btn-primary" type="submit" [disabled]="!formGroup.valid || isInProcessingState">
       Login
     </button>
   </div>

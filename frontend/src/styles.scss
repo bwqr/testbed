@@ -12,13 +12,7 @@
 
 @import '~bootstrap/dist/css/bootstrap.css';
 
-@import '~codemirror/lib/codemirror.css';
-
 html, body {
   min-height: 100vh;
   background-color: #f5f5fa;
-}
-
-.CodeMirror {
-  resize: vertical;
 }

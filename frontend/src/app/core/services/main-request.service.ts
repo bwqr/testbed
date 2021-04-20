@@ -1,7 +1,6 @@
 import {Injectable} from '@angular/core';
 import {HttpClient, HttpHeaders, HttpParams, HttpRequest} from '@angular/common/http';
 import {Observable} from 'rxjs';
-import {environment} from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -13,11 +12,9 @@ export class MainRequestService {
   ) {
   }
 
-  public static MAIN_URI: string = environment.apiEndpoint;
-
   private static trimProps(data: any): void {
     for (const prop in data) {
-      if (data.hasOwnProperty(prop) && typeof data[prop] === 'string') {
+      if (Object.prototype.hasOwnProperty.call(data, prop) && typeof data[prop] === 'string') {
         data[prop] = data[prop].trim();
       }
     }

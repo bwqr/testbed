@@ -1,9 +1,13 @@
-import {Component, OnInit} from '@angular/core';
+import {Component, ElementRef, OnInit, ViewChild} from '@angular/core';
 import {MainComponent} from '../../../shared/components/main/main.component';
 import {Job, SlimRunner} from '../../models';
 import {ExperimentViewModelService} from '../../services/experiment-view-model.service';
 import {ActivatedRoute} from '@angular/router';
 import {switchMap} from 'rxjs/operators';
+import {basicSetup, EditorState, EditorView} from '@codemirror/basic-setup';
+import {python} from '@codemirror/lang-python';
+import {formats} from '../../../../defs';
+
 
 @Component({
   selector: 'app-job',
@@ -14,6 +18,12 @@ export class JobComponent extends MainComponent implements OnInit {
 
   job: Job;
   runner: SlimRunner;
+
+  @ViewChild('code') code: ElementRef;
+
+  editor: EditorView;
+
+  formats = formats;
 
   get isPageReady(): boolean {
     return !!this.job && !!this.runner;
@@ -33,6 +43,25 @@ export class JobComponent extends MainComponent implements OnInit {
       ).subscribe(([job, runner]) => {
         this.job = job;
         this.runner = runner;
+
+        // experiment.code is html encoded, we need to decode it
+        const el = document.createElement('div');
+        el.innerHTML = this.job.code;
+        const renderedCode = el.textContent;
+
+        // experiment.code is html encoded, we need to decode it
+        this.editor = new EditorView({
+          state: EditorState.create({
+            doc: renderedCode,
+            extensions: [
+              basicSetup,
+              python(),
+              EditorState.tabSize.of(4),
+              EditorView.editable.of(false)
+            ]
+          }),
+          parent: this.code.nativeElement
+        });
       })
     );
   }

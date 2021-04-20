@@ -1,56 +1,60 @@
 <div class="container mt-4">
-  <div class="mb-5">
-    <h2 class="title">Experiment - {{experiment ? experiment.name : ''}}</h2>
+  <div class="mb-4">
+    <p class="fs-3">Experiment - {{experiment ? experiment.name : ''}}</p>
     <hr>
   </div>
 
-  <div>
-    <div class="d-flex justify-content-end mb-4" *ngIf="isPageReady">
-      <form class="d-flex align-items-center flex-grow-1 justify-content-start"
-            (ngSubmit)="runExperiment(formGroup.value)" [formGroup]="formGroup">
-        <label for="runner-id" class="mx-2">Runner</label>
-        <div class="nes-select mx-2" style="max-width: 300px">
-          <select formControlName="runnerId" id="runner-id">
-            <option *ngFor="let runner of runners" [ngValue]="runner.id">{{runner.name}}</option>
-          </select>
-        </div>
-        <button class="nes-btn is-success mx-2" type="submit" [disabled]="!formGroup.valid || isInProcessingState">
-          Run
-        </button>
-      </form>
-      <button class="nes-btn is-primary ml-4" (click)="saveExperiment()" [disabled]="isInProcessingState">Save
-        Experiment
+  <div class="d-flex justify-content-end mb-4" *ngIf="isPageReady">
+    <button class="btn btn-success" (click)="saveExperiment()" [disabled]="isInProcessingState">
+      Save Experiment
+    </button>
+    <form class="d-flex align-items-center flex-grow-1 justify-content-end"
+          (ngSubmit)="runExperiment(formGroup.value)" [formGroup]="formGroup">
+      <select class="form-select form-select-sm" style="max-width: 300px" formControlName="runnerId"
+              id="runner-id">
+        <option value="" disabled selected hidden>Select a runner</option>
+        <option *ngFor="let runner of runners" [ngValue]="runner.id">{{runner.name}}</option>
+      </select>
+
+      <button class="btn btn-primary mx-2" type="submit" [disabled]="!formGroup.valid || isInProcessingState">
+        Run
       </button>
-    </div>
-    <hr>
-    <div #code style="min-height: 50vh">Loading your code</div>
-    <div class="nes-table-responsive d-flex justify-content-center align-items-center" *ngIf="isPageReady">
-      <table class="nes-table is-bordered">
-        <thead>
-        <tr>
-          <th>Id</th>
-          <th>Runner</th>
-          <th>Status</th>
-          <th>Created at</th>
-          <th>Last update at</th>
-          <th></th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr *ngFor="let jobRunner of jobs.items">
-          <td><small>{{jobRunner[0].id}}</small></td>
-          <td><small>{{jobRunner[1].name}}</small></td>
-          <td><small>{{jobRunner[0].status}}</small></td>
-          <td><small>{{jobRunner[0].createdAt}}</small></td>
-          <td><small>{{jobRunner[0].updatedAt}}</small></td>
-          <td>
-            <a class="nes-btn is-primary" [routerLink]="['../../job', jobRunner[0].id]">
-              <small>Details</small>
-            </a>
-          </td>
-        </tr>
-        </tbody>
-      </table>
+    </form>
+  </div>
+  
+  <div class="bg-white rounded-3 shadow-sm p-md-5 p-3">
+    <div class="row">
+      <div class="col-xl-8">
+        <h1 class="fs-4">Code</h1>
+        <hr>
+        <div #code></div>
+      </div>
+      <div class="col">
+        <h1 class="fs-4">Jobs</h1>
+        <hr>
+        <table class="table table-hover table-responsive-sm mb-4" *ngIf="isPageReady">
+          <thead>
+          <tr>
+            <th>Id</th>
+            <th>Runner</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr *ngFor="let jobRunner of jobs.items">
+            <td><small>{{jobRunner[0].id}}</small></td>
+            <td><small>{{jobRunner[1].name}}</small></td>
+            <td><small>{{jobRunner[0].status}}</small></td>
+            <td>
+              <a class="btn btn-outline-dark" [routerLink]="['../../job', jobRunner[0].id]">
+                <small>Details</small>
+              </a>
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>

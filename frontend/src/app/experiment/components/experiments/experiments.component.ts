@@ -6,6 +6,7 @@ import {Pagination} from '../../../core/models';
 import {PaginationService} from '../../../core/services/pagination.service';
 import {ActivatedRoute} from '@angular/router';
 import {switchMap} from 'rxjs/operators';
+import {formats} from '../../../../defs';
 
 @Component({
   selector: 'app-experiments',
@@ -15,6 +16,14 @@ import {switchMap} from 'rxjs/operators';
 export class ExperimentsComponent extends MainComponent implements OnInit {
 
   experiments: Pagination<Experiment>;
+
+  paginationRange: number[] = [];
+
+  formats = formats;
+
+  get isPageReady(): boolean {
+    return !!this.experiments;
+  }
 
   constructor(
     private viewModel: ExperimentViewModelService,
@@ -28,7 +37,10 @@ export class ExperimentsComponent extends MainComponent implements OnInit {
     this.subs.add(
       this.activatedRoute.queryParams.pipe(
         switchMap((params) => this.viewModel.experiments(this.paginationService.getPaginationFromParams(params)))
-      ).subscribe(experiment => this.experiments = experiment)
+      ).subscribe(pagination => {
+        this.experiments = pagination;
+        this.paginationRange = Array(pagination.totalPages).fill(0).map((_, index) => index + 1);
+      })
     );
   }
 
