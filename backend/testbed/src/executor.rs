@@ -9,9 +9,16 @@ use serial::core::SerialDevice;
 use crate::connection::Connection;
 use crate::messages::{RunMessage, RunResultMessage};
 use crate::ModelId;
+use crate::state::Decoder;
 
 const PYTHON_VERSION: &str = "3.9";
 const ALPINE_VERSION: &str = "3.13";
+
+// in milliseconds
+const MAX_EXECUTION_TIME: u32 = 50000;
+
+// in milliseconds
+const MAX_EMIT_TIME: u32 = 10000;
 
 mod incoming {
     pub const SETUP_MESSAGE: &str = "arduino_available";
@@ -67,25 +74,55 @@ impl Executor {
     }
 
     fn run_transmitter_code(&self, script_dir: &str) -> Result<String, Error> {
-        let output = std::process::Command::new(self.docker_path.as_str())
+        let mut child = std::process::Command::new(self.docker_path.as_str())
             .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1"])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
-            .arg(format!("python:{}", PYTHON_VERSION).as_str())
+            .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
             .args(&["python", "/usr/local/scripts/job.py", "--transmitter"])
-            .output()
-            .map_err(|e| Error::IO(e))?;
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| Error::Custom(format!("Failed to spawn transmitter process, {:?}", e)))?;
 
-        if !output.status.success() {
-            // concatenate stdout and stderr
-            let mut err = String::from_utf8(output.stdout).map_err(|e| Error::String(e))?;
-            err += String::from_utf8(output.stderr).map_err(|e| Error::String(e))?.as_str();
+        // wait 10 second until receiver code exits
+        let mut exited = false;
+        for _ in 0..10 {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    exited = true;
 
-            return Err(Error::Output(err));
+                    // if not successful, gather the outputs
+                    if !status.success() {
+                        let mut output = String::new();
+                        child.stdout.unwrap().read_to_string(&mut output)
+                            .map_err(|e| Error::IO(e))?;
+                        child.stderr.unwrap().read_to_string(&mut output)
+                            .map_err(|e| Error::IO(e))?;
+
+                        return Err(Error::Output(output));
+                    }
+
+                    break;
+                }
+                Ok(None) => {}
+                Err(e) => return Err(Error::IO(e))
+            }
+
+            std::thread::sleep(Duration::from_secs(1));
         }
 
-        String::from_utf8(output.stdout)
-            .map_err(|e| Error::String(e))
+        if !exited {
+            let _ = child.kill();
+            return Err(Error::Custom(String::from("transmitter code did not exit in 10 seconds")));
+        }
+
+        let mut output = String::new();
+        child.stdout.unwrap().read_to_string(&mut output)
+            .map_err(|e| Error::IO(e))?;
+
+        Ok(output)
     }
 
     fn start_receiver(&self, script_dir: &str) -> Result<std::process::Child, Error> {
@@ -94,7 +131,7 @@ impl Executor {
             .arg(format!("--device={}", self.rx_dev_path.as_str()))
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
-            .arg(format!("python:{}", PYTHON_VERSION).as_str())
+            .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
             .args(&["python", "/usr/local/scripts/job.py", "--receiver", self.rx_dev_path.as_str()])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -177,6 +214,19 @@ impl Executor {
         Self::create_dir_and_files(script_dir.as_str(), code)?;
 
         let command_buffer = self.run_transmitter_code(script_dir.as_str())?;
+
+        let state = Decoder::decode(command_buffer.as_str())
+            .map_err(|e| Error::Custom(format!("Unable to decode state, {:?}", e)))?;
+
+        let execution_time = state.execution_time();
+        if execution_time > MAX_EXECUTION_TIME {
+            return Err(Error::Custom(format!("Max execution time is reached, execution time: {}", execution_time)));
+        }
+
+        let emit_time = state.emit_time();
+        if emit_time > MAX_EMIT_TIME {
+            return Err(Error::Custom(format!("Max emit time is reached, emit time: {}", emit_time)));
+        }
 
         let mut port = self.start_transmitter()?;
 

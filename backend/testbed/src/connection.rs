@@ -32,7 +32,7 @@ pub struct Connection {
     // this is the delay until we try connecting again
     current_timing_index: usize,
     executor: Option<Recipient<RunMessage>>,
-    pending_messages: Vec<Message>
+    pending_messages: Vec<Message>,
 }
 
 impl Connection {

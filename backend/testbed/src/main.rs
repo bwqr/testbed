@@ -9,6 +9,7 @@ use crate::messages::{RunMessage, UpdateExecutorMessage};
 mod connection;
 mod executor;
 mod messages;
+mod state;
 
 type ModelId = i32;
 
