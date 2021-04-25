@@ -1,24 +1,32 @@
 <div class="container mt-4">
   <div class="mb-4">
-    <h2 class="title">Password</h2>
+    <p class="fs-3">Settings</p>
     <hr>
   </div>
-  <div class="row">
-    <div class="col-md-4">
-      <form [formGroup]="formGroup" (ngSubmit)="updatePassword(formGroup.value)">
-        <div class="nes-field mb-4">
-          <label for="password">New password</label>
-          <input id="password" class="nes-input" type="password" formControlName="password" placeholder="New password" appFormValidity>
-        </div>
-        <div class="nes-field mb-4">
-          <label for="password-confirm">Password confirm</label>
-          <input id="password-confirm" class="nes-input" type="password" formControlName="passwordConfirm" placeholder="Password confirm" appFormValidity>
-        </div>
-
-        <div class="nes-field">
-          <button class="nes-btn is-primary w-100" type="submit" [disabled]="!formGroup.valid || isInProcessingState">Update Password</button>
-        </div>
-      </form>
+  <div class="bg-white rounded-3 shadow-sm p-md-5 p-3">
+    <div class="row">
+      <div class="col-md-4">
+        <p class="text-secondary">Update your password</p>
+      </div>
+      <div class="col-md-8 col-lg-4">
+        <form (ngSubmit)="updatePassword(formGroup.value)" [formGroup]="formGroup">
+          <div class="mb-3">
+            <label for="password">New password</label>
+            <input id="password" class="form-control" type="password" formControlName="password"
+                   placeholder="New password" appFormValidity/>
+          </div>
+          <div class="mb-3">
+            <label for="password-confirm">Password confirm</label>
+            <input id="password-confirm" class="form-control" type="password" formControlName="passwordConfirm"
+                   placeholder="Password confirm" appFormValidity/>
+          </div>
+          <div class="mb-3">
+            <button class="w-100 btn btn-primary" type="submit" [disabled]="!formGroup.valid || isInProcessingState">
+              Update Password
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </div>

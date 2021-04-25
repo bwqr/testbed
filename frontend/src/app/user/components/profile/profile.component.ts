@@ -4,6 +4,7 @@ import {User} from '../../models';
 import {UserViewModelService} from '../../services/user-view-model.service';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 import {finalize} from 'rxjs/operators';
+import {MainService} from '../../../core/services/main.service';
 
 @Component({
   selector: 'app-profile',
@@ -23,6 +24,7 @@ export class ProfileComponent extends MainComponent implements OnInit {
   constructor(
     private viewModel: UserViewModelService,
     private formBuilder: FormBuilder,
+    private service: MainService,
   ) {
     super();
 
@@ -52,6 +54,8 @@ export class ProfileComponent extends MainComponent implements OnInit {
         .subscribe(_ => {
           this.user.firstName = value.firstName;
           this.user.lastName = value.lastName;
+
+          this.service.alertSuccess('Profile is updated.');
         })
     );
   }

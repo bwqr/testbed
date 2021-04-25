@@ -3,6 +3,7 @@ import {FormBuilder, FormGroup, ValidationErrors, ValidatorFn, Validators} from 
 import {UserViewModelService} from '../../services/user-view-model.service';
 import {MainComponent} from '../../../shared/components/main/main.component';
 import {finalize} from 'rxjs/operators';
+import {MainService} from '../../../core/services/main.service';
 
 @Component({
   selector: 'app-settings',
@@ -16,6 +17,7 @@ export class SettingsComponent extends MainComponent implements OnInit {
   constructor(
     private viewModel: UserViewModelService,
     private formBuilder: FormBuilder,
+    private service: MainService,
   ) {
     super();
 
@@ -35,6 +37,8 @@ export class SettingsComponent extends MainComponent implements OnInit {
       this.viewModel.updatePassword(value.password).pipe(
         finalize(() => this.leaveProcessingState())
       ).subscribe(_ => {
+        this.service.alertSuccess('Password is updated.');
+        this.formGroup.reset();
       })
     );
   }

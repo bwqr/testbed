@@ -1,14 +1,37 @@
-<div *ngIf="isPageReady">
-  <p>{{user.id}}</p>
-  <p>{{user.firstName}}</p>
-  <p>{{user.lastName}}</p>
-  <p>{{user.email}}</p>
-  <p>{{user.status}}</p>
-  <p>{{user.roleId}}</p>
-
-  <form [formGroup]="formGroup" (ngSubmit)="updateProfile(formGroup.value)">
-    <input formControlName="firstName" type="text" appFormValidity>
-    <input formControlName="lastName" type="text" appFormValidity>
-    <button [disabled]="!formGroup.valid || isInProcessingState">Update</button>
-  </form>
+<div class="container mt-4">
+  <div class="mb-4">
+    <p class="fs-3">Profile</p>
+    <hr>
+  </div>
+  <div class="bg-white rounded-3 shadow-sm p-md-5 p-3">
+    <div class="row" *ngIf="isPageReady">
+      <div class="col-md-4">
+        <p>{{user.id}}</p>
+        <p>{{user.firstName}}</p>
+        <p>{{user.lastName}}</p>
+        <p>{{user.email}}</p>
+        <p>{{user.status}}</p>
+        <p>{{user.roleId}}</p>
+      </div>
+      <div class="col-md-8 col-lg-4">
+        <form (ngSubmit)="updateProfile(formGroup.value)" [formGroup]="formGroup">
+          <div class="mb-3">
+            <label for="first-name">First Name</label>
+            <input id="first-name" class="form-control" type="text" formControlName="firstName" placeholder="Name"
+                   appFormValidity/>
+          </div>
+          <div class="mb-3">
+            <label for="last-name">Last Name</label>
+            <input id="last-name" class="form-control" type="text" formControlName="lastName" placeholder="Name"
+                   appFormValidity/>
+          </div>
+          <div class="mb-3">
+            <button class="w-100 btn btn-primary" type="submit" [disabled]="!formGroup.valid || isInProcessingState">
+              Update
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>
