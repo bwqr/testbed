@@ -80,7 +80,7 @@ export class ExperimentComponent extends MainComponent implements OnInit {
         this.jobs = jobs;
 
         // experiment.code is html encoded, we need to decode it
-        const el = document.createElement('div');
+        const el = document.createElement('textarea');
         el.innerHTML = this.experiment.code;
         const renderedCode = el.textContent;
 

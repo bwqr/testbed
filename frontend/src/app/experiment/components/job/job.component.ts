@@ -18,6 +18,7 @@ export class JobComponent extends MainComponent implements OnInit {
 
   job: Job;
   runner: SlimRunner;
+  renderedOutput: string;
 
   @ViewChild('code') code: ElementRef;
 
@@ -45,9 +46,11 @@ export class JobComponent extends MainComponent implements OnInit {
         this.runner = runner;
 
         // experiment.code is html encoded, we need to decode it
-        const el = document.createElement('div');
+        const el = document.createElement('textarea');
         el.innerHTML = this.job.code;
         const renderedCode = el.textContent;
+        el.innerHTML = this.job.output;
+        this.renderedOutput = el.textContent;
 
         // experiment.code is html encoded, we need to decode it
         this.editor = new EditorView({
