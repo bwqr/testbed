@@ -12,13 +12,7 @@ class Spray(IntEnum):
     Spray_2 = 1
 
 
-class Encoders(IntEnum):
-    ByteEncoder = 0
-
-
 class Encoder:
-    id: int
-
     def encode(self, state) -> str:
         """Encode given state into string"""
         pass
@@ -63,8 +57,6 @@ class State:
 
 
 class WordEncoder(Encoder):
-    id: int = int(Encoders.ByteEncoder)
-
     def encode(self, state: State) -> str:
         output = '\n' + start_delimiter + '\n'
         for act in state.commands:

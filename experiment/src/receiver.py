@@ -21,13 +21,14 @@ class Connection(threading.Thread):
             sock.bind(('0.0.0.0', 8011))
             sock.listen(1)
             sock.settimeout(1)
-            # if main thread exited, terminate this thread
+            # run until main thread terminates
             while threading.main_thread().is_alive():
                 try:
                     conn, addr = sock.accept()
                     with conn:
                         conn.recv(len(end_of_experiment))
                         is_experiment_ended = True
+                # socket errors are ignored, like timeout
                 except socket.error:
                     pass
 
