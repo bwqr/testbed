@@ -33,44 +33,6 @@ struct SetFanRPM : Command {
     }
 };
 
-#define MAX_NUM_COMMAND 100
-
-struct State {
-    Command * next() {
-      if (this->current_command_index < this->len) {
-        auto clone = this->current_command_index;
-        this->current_command_index += 1;
-        return this->commands[clone];
-      } else {
-        return nullptr;
-      }
-    }
-
-    void addCommand(Command *command) {
-        if (this->len < MAX_NUM_COMMAND) {
-            this->commands[this->len] = command;
-            this->len += 1;
-        }
-    }
-
-    void reset() {
-        for (int i = 0; i < this->len; i++) {
-            delete this->commands[i];
-        }
-
-        this->current_command_index = 0;
-        this->len = 0;
-    }
-
-private:
-    Command *commands[MAX_NUM_COMMAND];
-    int current_command_index;
-    int len;
-};
-
-#undef  MAX_NUM_COMMAND
-
-
 enum DecodingCommand {
     Emit,
     Wait,
@@ -167,15 +129,12 @@ namespace outgoing {
 namespace incoming {
     const char * startDelimiter = "start_delimiter";
     const char * endDelimiter = "end_delimiter";
-    const char * abortExperiment = "abort_experiment";  
 }
 
 
 bool beginDecoding = false;
 bool lineCompleted = false;
-bool runExperiment = false;
 String line;
-State state = {};
 StreamDecoder decoder = {};
 
 void setup() {
@@ -188,52 +147,27 @@ void setup() {
 
 void loop() {
     if (lineCompleted) {
-        if (line == incoming::abortExperiment) {
-            reset();
-            return;
-        }
-        
         if (!beginDecoding && line == incoming::startDelimiter) {
             beginDecoding = true;
         }
 
         if (beginDecoding && line == incoming::endDelimiter) {
             beginDecoding = false;
-            runExperiment = true;
             decoder.reset();
         }
 
         if (beginDecoding) {
             auto ret = decoder.decode(line);
             if (ret.result == Success) {
-                state.addCommand(ret.command);
+                ret.command->run();
+                delete ret.command;
+                Serial.print(outgoing::endOfExperiment);
             }
         }
 
         lineCompleted = false;
         line = "";
     }
-
-    if (runExperiment) {
-        auto command = state.next();
-
-        if (command != nullptr) {
-          command->run(); 
-        } else { // end of experiment
-          Serial.print(outgoing::endOfExperiment);
-          reset();
-          return;
-        }
-    }
-}
-
-void reset() {
-    state.reset();
-    decoder.reset();
-    beginDecoding = false;
-    runExperiment = false;
-    lineCompleted = false;
-    line = "";
 }
 
 void serialEvent() {
