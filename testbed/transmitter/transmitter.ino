@@ -33,7 +33,7 @@ struct SetFanRPM : Command {
     }
 };
 
-#define MAX_NUM_COMMAND 200
+#define MAX_NUM_COMMAND 100
 
 struct State {
     Command * next() {
@@ -141,6 +141,7 @@ struct StreamDecoder {
       this->stage = 0;
       if (this->command) {
         delete this->command;
+        this->command = nullptr;
       }
     }
 
