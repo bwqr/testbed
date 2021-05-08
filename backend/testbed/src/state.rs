@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 
 pub const START_DELIMITER_NEW_LINE: &str = "start_delimiter\n";
 pub const END_DELIMITER_NEW_LINE: &str = "end_delimiter\n";
@@ -6,48 +5,29 @@ pub const END_DELIMITER_NEW_LINE: &str = "end_delimiter\n";
 pub const START_DELIMITER: &str = "start_delimiter";
 pub const END_DELIMITER: &str = "end_delimiter";
 
+const NUM_SPRAY: usize = 2;
+
 trait Encode {
     fn encode(&self) -> String;
 }
 
-enum Spray {
-    Spray1,
-    Spray2,
-}
-
-impl Spray {
-    fn as_u32(&self) -> u32 {
-        match self {
-            Spray::Spray1 => 0,
-            Spray::Spray2 => 1,
-        }
-    }
-}
-
-impl TryFrom<u32> for Spray {
-    type Error = Error;
-    fn try_from(num: u32) -> Result<Spray, Self::Error> {
-        match num {
-            0 => Ok(Spray::Spray1),
-            1 => Ok(Spray::Spray2),
-            _ => Err(Error::UnknownSpray)
-        }
-    }
-}
-
 struct Emit {
-    spray: Spray,
+    sprays: [bool; NUM_SPRAY],
     duration: u32,
 }
 
 impl Encode for Emit {
     fn encode(&self) -> String {
-        format!("emit\n{}\n{}\n", self.spray.as_u32(), self.duration)
+        let emits = self.sprays.iter()
+            .fold(String::from(""), |res, spray| {
+                res + if *spray { "1" } else { "0" }
+            });
+        format!("emit\n{}\n{}\n", emits, self.duration)
     }
 }
 
 struct Wait {
-    duration: u32
+    duration: u32,
 }
 
 impl Encode for Wait {
@@ -57,7 +37,7 @@ impl Encode for Wait {
 }
 
 struct SetFanRPM {
-    rpm: u32
+    rpm: u32,
 }
 
 impl Encode for SetFanRPM {
@@ -166,12 +146,17 @@ impl Decoder {
             }
 
             if line == "emit" {
-                let spray = Spray::try_from(
-                    lines.next()
-                        .ok_or(Error::MalformedInput)?
-                        .parse::<u32>()
-                        .map_err(|_| Error::MalformedInput)?
-                )?;
+                let spray_emits: &str = lines.next()
+                    .ok_or(Error::MalformedInput)?;
+
+                if spray_emits.len() != NUM_SPRAY {
+                    return Err(Error::MalformedInput);
+                }
+
+                let mut sprays = [false; NUM_SPRAY];
+
+                spray_emits.char_indices()
+                    .for_each(|(i, emit)| sprays[i] = emit == 'i');
 
                 let duration = lines.next()
                     .ok_or(Error::MalformedInput)?
@@ -179,7 +164,7 @@ impl Decoder {
                     .map_err(|_| Error::MalformedInput)?;
 
                 emits.push(Emit {
-                    spray,
+                    sprays,
                     duration,
                 });
                 order.push(Command::Emit);
@@ -227,6 +212,5 @@ impl Decoder {
 #[derive(Debug)]
 pub enum Error {
     MalformedInput,
-    UnknownSpray,
     UnknownCommand,
 }

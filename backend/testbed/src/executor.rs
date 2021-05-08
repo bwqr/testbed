@@ -35,17 +35,17 @@ pub struct Executor {
     connection: Addr<Connection>,
     docker_path: String,
     tx_dev_path: String,
-    rx_dev_path: String,
+    rx_dev_paths: Vec<String>,
     python_lib_path: String,
 }
 
 impl Executor {
-    pub fn new(connection: Addr<Connection>, docker_path: String, tx_dev_path: String, rx_dev_path: String, python_lib_path: String) -> Self {
+    pub fn new(connection: Addr<Connection>, docker_path: String, tx_dev_path: String, rx_dev_paths: Vec<String>, python_lib_path: String) -> Self {
         Executor {
             connection,
             docker_path,
             tx_dev_path,
-            rx_dev_path,
+            rx_dev_paths,
             python_lib_path,
         }
     }
@@ -127,13 +127,19 @@ impl Executor {
     }
 
     fn start_receiver(&self, script_dir: &str) -> Result<std::process::Child, Error> {
+        let devices = (&self.rx_dev_paths)
+            .into_iter()
+            .map(|dev| format!("--device={}", dev))
+            .collect::<Vec<String>>();
+
         std::process::Command::new(self.docker_path.as_str())
             .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1", "-p", "8011:8011"])
-            .arg(format!("--device={}", self.rx_dev_path.as_str()))
+            .args(&devices)
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
             .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
-            .args(&["python", "/usr/local/scripts/job.py", "--receiver", self.rx_dev_path.as_str()])
+            .args(&["python", "/usr/local/scripts/job.py", "--receiver"])
+            .args(&self.rx_dev_paths)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

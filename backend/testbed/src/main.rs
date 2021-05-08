@@ -13,12 +13,12 @@ mod state;
 
 type ModelId = i32;
 
-fn setup_executor(connection: Addr<Connection>, docker_path: String, tx_dev_path: String, rx_dev_path: String, python_lib_path: String) -> Recipient<RunMessage> {
+fn setup_executor(connection: Addr<Connection>, docker_path: String, tx_dev_path: String, rx_dev_paths: Vec<String>, python_lib_path: String) -> Recipient<RunMessage> {
     let (tx, rx) = channel::<Recipient<RunMessage>>();
 
     std::thread::Builder::new().name("executor".to_string()).spawn(move || {
         let sys = System::new("executor");
-        let executor = Executor::new(connection, docker_path, tx_dev_path, rx_dev_path, python_lib_path).start();
+        let executor = Executor::new(connection, docker_path, tx_dev_path, rx_dev_paths, python_lib_path).start();
         tx.send(executor.recipient::<RunMessage>()).expect("Failed to send Executor from thread");
         sys.run()
     }).expect("Failed to initialize thread");
@@ -34,8 +34,13 @@ fn main() {
     let server_url = std::env::var("SERVER_URL").expect("SERVER_URL is not provided in env");
     let docker_path = std::env::var("DOCKER_PATH").expect("DOCKER_PATH is not provided in env");
     let tx_dev_path = std::env::var("TRANSMITTER_DEVICE_PATH").expect("TRANSMITTER_DEVICE_PATH is not provided in env");
-    let rx_dev_path = std::env::var("RECEIVER_DEVICE_PATH").expect("RECEIVER_DEVICE_PATH is not provided in env");
     let python_lib_path = std::env::var("PYTHON_LIB_PATH").expect("PYTHON_LIB_PATH is not provided in env");
+
+    let rx_dev_paths = std::env::var("RECEIVER_DEVICE_PATHS").expect("RECEIVER_DEVICE_PATHS is not provided in env")
+        .split(",")
+        .into_iter()
+        .map(|reference| String::from(reference))
+        .collect::<Vec<String>>();
 
     // Enable logger
     env_logger::init();
@@ -45,7 +50,7 @@ fn main() {
     Arbiter::spawn(async move {
         let connection = Connection::new(server_url, access_token).start();
 
-        let executor = setup_executor(connection.clone(), docker_path, tx_dev_path, rx_dev_path, python_lib_path);
+        let executor = setup_executor(connection.clone(), docker_path, tx_dev_path, rx_dev_paths, python_lib_path);
 
         connection
             .send(UpdateExecutorMessage { executor })
