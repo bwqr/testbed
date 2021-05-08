@@ -1,5 +1,6 @@
 import time
 from enum import IntEnum
+from typing import List
 
 from serial import Serial
 
@@ -23,8 +24,8 @@ class Command:
 
 
 class Emit(Command):
-    def __init__(self, spray: Spray, duration: int):
-        self.spray = spray
+    def __init__(self, sprays: List[Spray], duration: int):
+        self.sprays = sprays
         self.duration = duration
 
 
@@ -43,8 +44,8 @@ class State:
         self.commands = []
         self.encoder = encoder
 
-    def emit(self, spray: Spray, duration: int):
-        self.commands.append(Emit(spray, duration))
+    def emit(self, sprays: List[Spray], duration: int):
+        self.commands.append(Emit(sprays, duration))
 
     def wait(self, duration: int):
         self.commands.append(Wait(duration))
@@ -66,7 +67,15 @@ class WordEncoder(Encoder):
 
     def _encode_action(self, cmd: Command) -> str:
         if isinstance(cmd, Emit):
-            return 'emit\n{}\n{}'.format(int(cmd.spray), cmd.duration)
+            sprays = ''
+
+            for spray in list(Spray):
+                if spray in cmd.sprays:
+                    sprays += '1'
+                else:
+                    sprays += '0'
+
+            return 'emit\n{}\n{}'.format(sprays, cmd.duration)
         elif isinstance(cmd, Wait):
             return 'wait\n{}'.format(int(cmd.duration))
         elif isinstance(cmd, SetFanRPM):
@@ -83,20 +92,19 @@ def run():
     state = State(WordEncoder())
     for i in range(0, 6):
         state.wait(wait_duration)
-        state.emit(Spray.Spray_1, emit_duration)
+        state.emit([Spray.Spray_1], emit_duration)
 
     state.wait(wait_duration)
-    state.emit(Spray.Spray_1, emit_duration)
+    state.emit([Spray.Spray_1], emit_duration)
 
     output = state.execute()
 
-    with Serial('/dev/ttyUSB0', 9600) as ser:
+    with Serial('/dev/ttyUSB1', 9600) as ser:
         # wait for a little time while Arduino resets
-        time.sleep(2)
-        ser.write(output.encode())
-        # for i in output:
-        #     print(i)
-        #     ser.write(i.encode())
+        time.sleep(3)
+        # ser.write(output.encode())
+        for i in output:
+            ser.write(i.encode())
         # print(ser.read(30))
         # time.sleep(0.01)
 

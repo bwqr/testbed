@@ -1,7 +1,7 @@
 import socket
 import threading
 from random import random
-from typing import Union
+from typing import Tuple, List
 
 from serial import Serial
 
@@ -34,32 +34,36 @@ class Connection(threading.Thread):
 
 
 class Receiver:
-    def __init__(self, device_path):
+    def __init__(self, device_paths: List[str]):
         self.connection = Connection(name='connection-thread')
         self.connection.start()
-        self.dev = Serial(device_path, 9600)
-        self.dev.read(len(start_message))
+        self.devs = list(map(lambda path: Serial(path, 9600), device_paths))
+        for dev in self.devs:
+            dev.read(len(start_message))
 
-    def next(self) -> Union[int, None]:
-        if is_experiment_ended:
-            if self.dev:
-                self.dev.close()
-                self.dev = None
+    def next(self) -> Tuple[bool, List[int]]:
+        read_data = []
+        for dev in self.devs:
+            read_data.append(int(dev.read()))
 
-            return None
-        else:
-            return int(self.dev.read())
+        return is_experiment_ended, read_data
 
 
 def run():
-    receiver = Receiver('/dev/ttyUSB0')
+    receiver = Receiver(['/dev/ttyUSB0', '/dev/ttyUSB1'])
 
-    rx = receiver.next()
-    while rx is not None:
-        for i in range(0, int(random()) * 10):
-            rx = rx * 5
-        print(rx)
-        rx = receiver.next()
+    i = 0
+    ended, data = receiver.next()
+    while ended is not None and i < 5000:
+        if ended:
+            i += 1
+
+        for d in data:
+            for _ in range(0, int(random() * 10)):
+                d = d * 5
+            print(d)
+
+        ended, data = receiver.next()
 
 
 if __name__ == '__main__':
