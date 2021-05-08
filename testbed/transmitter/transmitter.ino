@@ -1,9 +1,8 @@
-const int sprayControlPin1 = 2; // the pin number for the digital output pin contrillong the Spray1
-const int sprayControlPin2 = 4; // the pin number for the digital output pin contrillong the Spray2
+#define NUM_SPRAYS 2
 
-enum Spray {
-  Spray_1,
-  Spray_2
+const int sprayPins[NUM_SPRAYS] = {
+        2, // pin number of spray 1
+        4 // pin number of spray 2
 };
 
 struct Command {
@@ -19,19 +18,23 @@ struct Wait : Command {
 };
 
 struct Emit : Command {
-  Spray spray;
+  bool sprays[NUM_SPRAYS];
   int duration;
 
   void run() const override {
-      auto sprayPin = sprayControlPin1;
-      if (this->spray == Spray_2) {
-        sprayPin = sprayControlPin2;
+      for (int i = 0; i < NUM_SPRAYS; i++) {
+        if (this->sprays[i]) {
+          digitalWrite(sprayPins[i], HIGH);
+        }
       }
-      digitalWrite(sprayPin, HIGH);
+
       digitalWrite(LED_BUILTIN, HIGH);
       delay(this->duration);
-      digitalWrite(sprayPin, LOW);
       digitalWrite(LED_BUILTIN, LOW);
+
+      for(int i = 0; i < NUM_SPRAYS; i++) {
+        digitalWrite(sprayPins[i], LOW);
+      }
   }
 };
 
@@ -87,7 +90,13 @@ struct StreamDecoder {
             return {NeedMoreInput, nullptr};
         } else if (decodingCommand == Emit) {
             if (this->stage == 0) {
-                static_cast<struct Emit *>(this->command)->spray = static_cast<enum Spray>(atoi(line.c_str()));
+                const char * cline = line.c_str();
+                auto p = static_cast<struct Emit *>(this->command);
+
+                for(int i = 0; i < NUM_SPRAYS; i++) {
+                  p->sprays[i] = cline[i] == '1';
+                }
+
                 this->stage += 1;
 
                 return {NeedMoreInput, nullptr};
@@ -154,8 +163,9 @@ void setup() {
   Serial.print(outgoing::setupMessage);
 
     // initialize the spray control pin as output:
-  pinMode(sprayControlPin1, OUTPUT); 
-  pinMode(sprayControlPin2, OUTPUT); 
+    for (int i = 0; i < NUM_SPRAYS; i++) {
+      pinMode(sprayPins[i], OUTPUT);
+    }
 }
 
 void loop() {
