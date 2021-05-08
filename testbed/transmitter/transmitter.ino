@@ -1,3 +1,6 @@
+const int sprayControlPin1 = 2; // the pin number for the digital output pin contrillong the Spray1
+const int sprayControlPin2 = 4; // the pin number for the digital output pin contrillong the Spray2
+
 enum Spray {
   Spray_1,
   Spray_2
@@ -20,8 +23,14 @@ struct Emit : Command {
   int duration;
 
   void run() const override {
+      auto sprayPin = sprayControlPin1;
+      if (this->spray == Spray_2) {
+        sprayPin = sprayControlPin2;
+      }
+      digitalWrite(sprayPin, HIGH);
       digitalWrite(LED_BUILTIN, HIGH);
       delay(this->duration);
+      digitalWrite(sprayPin, LOW);
       digitalWrite(LED_BUILTIN, LOW);
   }
 };
@@ -143,6 +152,10 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.print(outgoing::setupMessage);
+
+    // initialize the spray control pin as output:
+  pinMode(sprayControlPin1, OUTPUT); 
+  pinMode(sprayControlPin2, OUTPUT); 
 }
 
 void loop() {
