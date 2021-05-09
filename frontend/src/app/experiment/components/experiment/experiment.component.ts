@@ -13,7 +13,9 @@ import {NotificationKind} from '../../../core/websocket/models';
 import {basicSetup, EditorState, EditorView} from '@codemirror/basic-setup';
 import {python} from '@codemirror/lang-python';
 import {keymap} from '@codemirror/view';
-import {defaultTabBinding} from '@codemirror/commands';
+import {indentLess, indentMore} from '@codemirror/commands';
+import {Transaction} from '@codemirror/state';
+import {indentUnit} from '@codemirror/language';
 
 
 @Component({
@@ -91,8 +93,32 @@ export class ExperimentComponent extends MainComponent implements OnInit {
             extensions: [
               basicSetup,
               python(),
-              // EditorState.tabSize.of(4),
-              keymap.of([defaultTabBinding])
+              indentUnit.of(' '.repeat(4)),
+              keymap.of([
+                {
+                  key: 'Tab',
+                  run: ({state, dispatch}) => {
+                    if (state.selection.ranges.some(r => !r.empty)) {
+                      return indentMore({state, dispatch});
+                    }
+                    dispatch(state.update(state.replaceSelection(' '.repeat(4)), {
+                      scrollIntoView: true,
+                      annotations: Transaction.userEvent.of('input')
+                    }));
+                    return true;
+                  }, shift: indentLess
+                },
+                {
+                  key: 'Mod-s',
+                  run: ({state, dispatch}) => {
+                    if (!this.isInProcessingState) {
+                      this.saveExperiment();
+                    }
+                    return true;
+                  },
+                  preventDefault: true
+                },
+              ])
             ]
           }),
           parent: this.code.nativeElement

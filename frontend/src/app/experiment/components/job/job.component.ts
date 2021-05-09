@@ -59,7 +59,6 @@ export class JobComponent extends MainComponent implements OnInit {
             extensions: [
               basicSetup,
               python(),
-              EditorState.tabSize.of(4),
               EditorView.editable.of(false)
             ]
           }),
