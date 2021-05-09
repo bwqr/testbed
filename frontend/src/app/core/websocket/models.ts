@@ -1,3 +1,5 @@
+import {JobStatus} from '../../experiment/models';
+
 export enum ConnectionStatus {
   Initial,
   Open,
@@ -14,16 +16,19 @@ export enum IncomingMessageKind {
   Notification = 'Notification',
 }
 
+export enum NotificationKind {
+  JobUpdate = 'JobUpdate'
+}
+
+export class NotificationData {
+}
+
 export interface Notification<T> {
   userId: number;
   message: NotificationMessage<T>;
 }
 
-export interface NotificationMessage<T> {
+export interface NotificationMessage<T extends NotificationData> {
   kind: NotificationKind;
   data: T;
-}
-
-export enum NotificationKind {
-  JobUpdate = 'JobUpdate'
 }

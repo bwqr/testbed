@@ -15,7 +15,7 @@ export class ExperimentViewModelService extends MainViewModelService {
 
   constructor(
     protected cacheService: CacheService,
-    protected requestService: MainRequestService
+    protected requestService: MainRequestService,
   ) {
     super(cacheService, requestService);
   }

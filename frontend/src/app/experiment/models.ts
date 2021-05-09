@@ -1,3 +1,5 @@
+import {NotificationData} from '../core/websocket/models';
+
 export interface Experiment {
   id: number;
   userId: number;
@@ -28,7 +30,7 @@ export interface Job extends SlimJob {
 }
 
 
-export interface JobUpdate {
+export interface JobUpdate extends NotificationData {
   jobId: number;
   status: JobStatus;
 }

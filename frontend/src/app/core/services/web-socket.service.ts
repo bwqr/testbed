@@ -1,6 +1,6 @@
 import {Injectable} from '@angular/core';
 import {BehaviorSubject, Observable, Subject, Subscription, timer} from 'rxjs';
-import {ConnectionStatus, IncomingMessageKind, NotificationKind, OutgoingMessageKind} from '../websocket/models';
+import {ConnectionStatus, IncomingMessageKind, Notification, OutgoingMessageKind} from '../websocket/models';
 import {environment} from '../../../environments/environment';
 import {map, tap} from 'rxjs/operators';
 
@@ -108,7 +108,7 @@ export class WebSocketService {
     // Do not update status since connection.onclose already does that for us
   }
 
-  listenNotifications(): Subject<{ userId: number; message: { kind: NotificationKind; data: any; } }> {
+  listenNotifications(): Subject<Notification<any>> {
     return this.$notification;
   }
 
@@ -121,7 +121,10 @@ export class WebSocketService {
   }
 
   private messageHandler(event: MessageEvent): void {
-    const message = JSON.parse(event.data);
+    const message: {
+      kind: IncomingMessageKind.Notification | IncomingMessageKind.Error,
+      data: Notification<any> | any
+    } = JSON.parse(event.data);
 
     if (message.kind === IncomingMessageKind.Notification) {
       this.$notification.next(message.data);
