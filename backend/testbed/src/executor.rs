@@ -1,13 +1,14 @@
 use std::io::{Read, Write};
 use std::process::{ExitStatus, Stdio};
+use std::sync::Mutex;
 use std::time::Duration;
 
 use actix::prelude::*;
-use log::error;
+use log::{error, info};
 use serial::core::SerialDevice;
 
 use crate::connection::Connection;
-use crate::messages::{RunMessage, RunResultMessage};
+use crate::messages::{ReceiverStatusMessage, RunMessage, RunResultMessage};
 use crate::ModelId;
 use crate::state::{Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, State};
 
@@ -37,6 +38,7 @@ pub struct Executor {
     tx_dev_path: String,
     rx_dev_paths: Vec<String>,
     python_lib_path: String,
+    rx_lock: Mutex<()>,
 }
 
 impl Executor {
@@ -47,6 +49,7 @@ impl Executor {
             tx_dev_path,
             rx_dev_paths,
             python_lib_path,
+            rx_lock: Mutex::new(()),
         }
     }
 
@@ -326,8 +329,56 @@ impl Executor {
     }
 }
 
+impl Executor {
+    fn send_receiver_status(act: &mut Executor, ctx: &mut <Self as Actor>::Context) {
+        if let std::sync::TryLockResult::Ok(_) = act.rx_lock.try_lock() {
+            let serials: Vec<Option<serial::SystemPort>> = act.rx_dev_paths.iter()
+                .map(|path| {
+                    match serial::open(path) {
+                        Ok(mut port) => {
+                            match port.set_timeout(Duration::from_secs(5)) {
+                                Ok(_) => Some(port),
+                                Err(_) => None
+                            }
+                        }
+                        Err(_) => None
+                    }
+                })
+                .collect();
+
+            let mut outputs: Vec<u8> = Vec::with_capacity(serials.len());
+
+            for serial in serials {
+                match serial {
+                    Some(mut serial) => {
+                        let mut buff: [u8; 1] = [0];
+                        match serial.read(&mut buff) {
+                            Ok(_) => outputs.push(buff[0]),
+                            Err(_) => outputs.push(0)
+                        }
+                    }
+                    None => outputs.push(0)
+                }
+            }
+
+            act.connection.do_send(ReceiverStatusMessage { outputs });
+
+            ctx.run_later(Duration::from_secs(2), Self::send_receiver_status);
+        }
+    }
+}
+
 impl Actor for Executor {
     type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        info!("Executor is started!");
+        ctx.run_later(Duration::from_secs(2), Self::send_receiver_status);
+    }
+
+    fn stopped(&mut self, _ctx: &mut Context<Self>) {
+        info!("Executor is stopped!");
+    }
 }
 
 impl Handler<RunMessage> for Executor {
@@ -337,6 +388,9 @@ impl Handler<RunMessage> for Executor {
         let job_id = msg.job_id;
 
         let addr = self.connection.clone();
+
+        // lock the receiver
+        let _ = self.rx_lock.lock().unwrap();
 
         let (output, successful) = match self.handle_execution(msg.job_id, msg.code) {
             Ok(output) => (output, true),

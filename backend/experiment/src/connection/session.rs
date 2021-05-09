@@ -6,7 +6,7 @@ use core::types::ModelId;
 use shared::SocketErrorKind;
 use shared::websocket_messages::{client, server};
 
-use crate::connection::messages::{JoinServerMessage, RunMessage, RunResultMessage, DisconnectServerMessage};
+use crate::connection::messages::{DisconnectServerMessage, JoinServerMessage, RunMessage, RunResultMessage};
 use crate::connection::server::ExperimentServer;
 
 pub struct Session {
@@ -57,6 +57,9 @@ impl Session {
                         }
                             .into_actor(self)
                             .spawn(ctx);
+                    }
+                    server::SocketMessageKind::ReceiverStatus => {
+                        info!("received receiver status {}", text);
                     }
                 }
             }

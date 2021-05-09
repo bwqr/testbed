@@ -14,7 +14,7 @@ use log::{error, info};
 use shared::SocketErrorKind;
 use shared::websocket_messages::{client, server};
 
-use crate::messages::{RunMessage, RunResultMessage, UpdateExecutorMessage};
+use crate::messages::{ReceiverStatusMessage, RunMessage, RunResultMessage, UpdateExecutorMessage};
 
 type Write = SinkWrite<Message, SplitSink<Framed<BoxedSocket, Codec>, Message>>;
 
@@ -150,10 +150,14 @@ impl Actor for Connection {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        info!("Connection is started!");
+
         Self::try_connect(self, ctx);
     }
 
-    fn stopped(&mut self, _: &mut Self::Context) {}
+    fn stopped(&mut self, _: &mut Self::Context) {
+        info!("Connection is stopped!");
+    }
 }
 
 impl StreamHandler<Result<Frame, WsProtocolError>> for Connection {
@@ -180,6 +184,25 @@ impl Handler<UpdateExecutorMessage> for Connection {
 
     fn handle(&mut self, msg: UpdateExecutorMessage, _: &mut Self::Context) {
         self.executor = Some(msg.executor);
+    }
+}
+
+impl Handler<ReceiverStatusMessage> for Connection {
+    type Result = ();
+
+    fn handle(&mut self, msg: ReceiverStatusMessage, _: &mut Self::Context) {
+        let message = Message::Text(serde_json::to_string(&server::SocketMessage {
+            kind: server::SocketMessageKind::ReceiverStatus,
+            data: server::ReceiverStatus {
+                outputs: msg.outputs,
+            },
+        }).unwrap());
+
+        if let Some(sink) = &mut self.sink {
+            if let Some(_) = sink.write(message) {
+                error!("unable to send receiver status to server");
+            }
+        }
     }
 }
 

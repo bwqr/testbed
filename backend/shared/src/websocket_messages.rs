@@ -7,12 +7,13 @@ pub mod server {
 
     #[derive(Deserialize, Serialize)]
     pub enum SocketMessageKind {
-        RunResult
+        RunResult,
+        ReceiverStatus
     }
 
     #[derive(Deserialize, Serialize)]
     pub struct BaseMessage {
-        pub kind: SocketMessageKind
+        pub kind: SocketMessageKind,
     }
 
     #[derive(Deserialize, Serialize)]
@@ -27,6 +28,11 @@ pub mod server {
         pub output: String,
         pub successful: bool,
     }
+
+    #[derive(Deserialize, Serialize)]
+    pub struct ReceiverStatus {
+        pub outputs: Vec<u8>,
+    }
 }
 
 pub mod client {
@@ -39,7 +45,7 @@ pub mod client {
 
     #[derive(Deserialize, Serialize)]
     pub struct BaseMessage {
-        pub kind: SocketMessageKind
+        pub kind: SocketMessageKind,
     }
 
     #[derive(Deserialize, Serialize)]

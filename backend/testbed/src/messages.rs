@@ -19,6 +19,12 @@ pub struct RunResultMessage {
 
 #[derive(Message)]
 #[rtype(result = "()")]
+pub struct ReceiverStatusMessage {
+    pub outputs: Vec<u8>,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
 pub struct UpdateExecutorMessage {
-    pub executor: Recipient<RunMessage>
+    pub executor: Recipient<RunMessage>,
 }
