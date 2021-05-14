@@ -6,8 +6,8 @@ extern crate lazy_static;
 use std::fmt::Debug;
 
 use actix_web::http::StatusCode;
-pub use htmlescape::encode_minimal;
 pub use htmlescape::decode_html;
+pub use htmlescape::encode_minimal;
 
 use crate::error::{ErrorMessaging, HttpError};
 
@@ -37,6 +37,9 @@ pub enum ErrorMessage {
     HashFailed,
     AskamaError,
     InvalidOperationForStatus,
+    Forbidden,
+    MiddlewareFailed,
+    Custom(&'static str),
 }
 
 impl ErrorMessaging for ErrorMessage {
@@ -106,7 +109,22 @@ impl ErrorMessaging for ErrorMessage {
                 code: StatusCode::BAD_REQUEST,
                 error_code: 113,
                 message: String::from("web_socket_connection_error"),
-            }
+            },
+            ErrorMessage::Forbidden => HttpError {
+                code: StatusCode::FORBIDDEN,
+                error_code: 114,
+                message: String::from("access_denied"),
+            },
+            ErrorMessage::MiddlewareFailed => HttpError {
+                code: StatusCode::INTERNAL_SERVER_ERROR,
+                error_code: 115,
+                message: String::from("middleware_failed"),
+            },
+            ErrorMessage::Custom(str) => HttpError {
+                code: StatusCode::INTERNAL_SERVER_ERROR,
+                error_code: 116,
+                message: String::from(*str),
+            },
         }
     }
 }

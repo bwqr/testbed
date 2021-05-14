@@ -8,13 +8,14 @@ use log::{error, info};
 use serial::core::SerialDevice;
 
 use crate::connection::Connection;
-use crate::messages::{ReceiverStatusMessage, RunMessage, RunResultMessage};
+use crate::messages::{RunnerReceiversValueMessage, RunMessage, RunResultMessage};
 use crate::ModelId;
 use crate::state::{Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, State};
 
 const PYTHON_VERSION: &str = "3.9";
 const ALPINE_VERSION: &str = "3.13";
 
+const SEND_RECEIVERS_VALUES_INTERVAL: u64 = 10;
 
 mod limits {
     // in milliseconds
@@ -330,7 +331,7 @@ impl Executor {
 }
 
 impl Executor {
-    fn send_receiver_status(act: &mut Executor, ctx: &mut <Self as Actor>::Context) {
+    fn send_receivers_values(act: &mut Executor, ctx: &mut <Self as Actor>::Context) {
         if let std::sync::TryLockResult::Ok(_) = act.rx_lock.try_lock() {
             let serials: Vec<Option<serial::SystemPort>> = act.rx_dev_paths.iter()
                 .map(|path| {
@@ -346,24 +347,25 @@ impl Executor {
                 })
                 .collect();
 
-            let mut outputs: Vec<u8> = Vec::with_capacity(serials.len());
+            let mut values: Vec<u8> = Vec::with_capacity(serials.len());
 
             for serial in serials {
                 match serial {
                     Some(mut serial) => {
                         let mut buff: [u8; 1] = [0];
+
                         match serial.read(&mut buff) {
-                            Ok(_) => outputs.push(buff[0]),
-                            Err(_) => outputs.push(0)
+                            Ok(_) => values.push(buff[0]),
+                            Err(_) => values.push(0)
                         }
                     }
-                    None => outputs.push(0)
+                    None => values.push(0)
                 }
             }
 
-            act.connection.do_send(ReceiverStatusMessage { outputs });
+            act.connection.do_send(RunnerReceiversValueMessage { values });
 
-            ctx.run_later(Duration::from_secs(2), Self::send_receiver_status);
+            ctx.run_later(Duration::from_secs(SEND_RECEIVERS_VALUES_INTERVAL), Self::send_receivers_values);
         }
     }
 }
@@ -373,7 +375,7 @@ impl Actor for Executor {
 
     fn started(&mut self, ctx: &mut Context<Self>) {
         info!("Executor is started!");
-        ctx.run_later(Duration::from_secs(2), Self::send_receiver_status);
+        ctx.run_later(Duration::from_secs(SEND_RECEIVERS_VALUES_INTERVAL), Self::send_receivers_values);
     }
 
     fn stopped(&mut self, _ctx: &mut Context<Self>) {

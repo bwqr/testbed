@@ -14,7 +14,7 @@ use log::{error, info};
 use shared::SocketErrorKind;
 use shared::websocket_messages::{client, server};
 
-use crate::messages::{ReceiverStatusMessage, RunMessage, RunResultMessage, UpdateExecutorMessage};
+use crate::messages::{RunnerReceiversValueMessage, RunMessage, RunResultMessage, UpdateExecutorMessage};
 
 type Write = SinkWrite<Message, SplitSink<Framed<BoxedSocket, Codec>, Message>>;
 
@@ -187,14 +187,14 @@ impl Handler<UpdateExecutorMessage> for Connection {
     }
 }
 
-impl Handler<ReceiverStatusMessage> for Connection {
+impl Handler<RunnerReceiversValueMessage> for Connection {
     type Result = ();
 
-    fn handle(&mut self, msg: ReceiverStatusMessage, _: &mut Self::Context) {
+    fn handle(&mut self, msg: RunnerReceiversValueMessage, _: &mut Self::Context) {
         let message = Message::Text(serde_json::to_string(&server::SocketMessage {
             kind: server::SocketMessageKind::ReceiverStatus,
-            data: server::ReceiverStatus {
-                outputs: msg.outputs,
+            data: server::RunnerReceiverValue {
+                values: msg.values,
             },
         }).unwrap());
 

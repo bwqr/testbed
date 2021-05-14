@@ -19,8 +19,8 @@ pub struct RunResultMessage {
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct ReceiverStatusMessage {
-    pub outputs: Vec<u8>,
+pub struct RunnerReceiversValueMessage {
+    pub values: Vec<u8>,
 }
 
 #[derive(Message)]

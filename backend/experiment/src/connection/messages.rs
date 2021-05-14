@@ -32,3 +32,18 @@ pub struct RunResultMessage {
     pub output: String,
     pub successful: bool,
 }
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct UpdateRunnerValue {
+    pub runner_id: ModelId,
+    pub values: Vec<u8>,
+}
+
+pub struct ReceiverValues {
+    pub runner_id: ModelId,
+}
+
+impl Message for ReceiverValues {
+    type Result = Result<Option<Vec<u8>>, ()>;
+}

@@ -30,8 +30,8 @@ pub mod server {
     }
 
     #[derive(Deserialize, Serialize)]
-    pub struct ReceiverStatus {
-        pub outputs: Vec<u8>,
+    pub struct RunnerReceiverValue {
+        pub values: Vec<u8>,
     }
 }
 

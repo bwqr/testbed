@@ -4,10 +4,11 @@ use actix_web_actors::ws;
 use diesel::prelude::*;
 use diesel::result::Error;
 use log::error;
+use serde_json::json;
 
 use core::db::DieselEnum;
 use core::error::ErrorMessaging;
-use core::ErrorMessage;
+use core::ErrorMessage as CoreErrorMessage;
 use core::models::paginate::{CountStarOver, Paginate, PaginationRequest};
 use core::responses::{SuccessResponse, TokenResponse};
 use core::sanitized::SanitizedJson;
@@ -16,8 +17,10 @@ use core::types::{DBPool, DefaultResponse, ModelId};
 use core::utils::Hash;
 use user::models::user::User;
 
+use crate::connection::ReceiverValues;
 use crate::connection::server::{ExperimentServer, RunExperiment};
 use crate::connection::session::Session;
+use crate::ErrorMessage;
 use crate::models::experiment::{Experiment, SLIM_EXPERIMENT_COLUMNS, SlimExperiment};
 use crate::models::job::{Job, JobStatus, SLIM_JOB_COLUMNS, SlimJob};
 use crate::models::runner::{Runner, RunnerToken, SLIM_RUNNER_COLUMNS, SlimRunner};
@@ -35,7 +38,7 @@ pub async fn join_server(
     let conn = pool.get().unwrap();
 
     let token = hash.decode::<RunnerToken>(token.token.as_str())
-        .map_err(|_| ErrorMessage::InvalidToken)?;
+        .map_err(|_| CoreErrorMessage::InvalidToken)?;
 
     let runner = web::block(move || runners::table
         .filter(runners::access_key.eq(token.access_key))
@@ -44,7 +47,7 @@ pub async fn join_server(
         .await?;
 
     ws::start(Session::new(experiment_server.get_ref().clone(), runner.id), &req, stream)
-        .map_err(|_| Box::new(ErrorMessage::WebSocketConnectionError) as Box<dyn ErrorMessaging>)
+        .map_err(|_| Box::new(CoreErrorMessage::WebSocketConnectionError) as Box<dyn ErrorMessaging>)
 }
 
 #[get("runners")]
@@ -59,6 +62,33 @@ pub async fn fetch_runners(pool: web::Data<DBPool>) -> DefaultResponse {
         .await?;
 
     Ok(HttpResponse::Ok().json(runners))
+}
+
+#[get("runner/{id}")]
+pub async fn fetch_runner(pool: web::Data<DBPool>, runner_id: web::Path<ModelId>) -> DefaultResponse {
+    let conn = pool.get().unwrap();
+
+    let runner = web::block(move ||
+        runners::table
+            .find(runner_id.into_inner())
+            .select(SLIM_RUNNER_COLUMNS)
+            .first::<SlimRunner>(&conn)
+    )
+        .await?;
+
+    Ok(HttpResponse::Ok().json(runner))
+}
+
+#[get("runner/{id}/values")]
+pub async fn runner_receiver_values(experiment_server: web::Data<Addr<ExperimentServer>>, runner_id: web::Path<ModelId>) -> DefaultResponse {
+    let values = experiment_server.send(ReceiverValues { runner_id: runner_id.into_inner() })
+        .await
+        .map_err(|_| CoreErrorMessage::Custom("failed to receive receiver status from experiment server"))?
+        .map_err(|_| ErrorMessage::UnknownRunner)?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "values": values
+    })))
 }
 
 #[get("experiments")]

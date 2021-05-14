@@ -6,7 +6,7 @@ use core::types::ModelId;
 use shared::SocketErrorKind;
 use shared::websocket_messages::{client, server};
 
-use crate::connection::messages::{DisconnectServerMessage, JoinServerMessage, RunMessage, RunResultMessage};
+use crate::connection::messages::{DisconnectServerMessage, JoinServerMessage, RunMessage, RunResultMessage, UpdateRunnerValue};
 use crate::connection::server::ExperimentServer;
 
 pub struct Session {
@@ -59,7 +59,24 @@ impl Session {
                             .spawn(ctx);
                     }
                     server::SocketMessageKind::ReceiverStatus => {
-                        info!("received receiver status {}", text);
+                        let receiver_value = serde_json::from_str::<'_, server::SocketMessage<server::RunnerReceiverValue>>(text)
+                            .map_err(|_| SocketErrorKind::InvalidMessage)?;
+
+                        let exp_addr = self.experiment_server.clone();
+
+                        let msg = UpdateRunnerValue {
+                            runner_id: self.runner_id,
+                            values: receiver_value.data.values,
+                        };
+
+                        async move {
+                            if let Err(e) = exp_addr.send(msg)
+                                .await {
+                                error!("Sending receiver status to experiment server is failed: {:?}", e);
+                            }
+                        }
+                            .into_actor(self)
+                            .spawn(ctx);
                     }
                 }
             }

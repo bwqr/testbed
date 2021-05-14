@@ -1,7 +1,10 @@
+use actix_web::http::StatusCode;
 use actix_web::web;
 
 pub use connection::server::ExperimentServer;
+use core::error::{ErrorMessaging, HttpError};
 use core::middlewares::auth::Auth;
+use core::middlewares::role::AdminUser;
 
 mod handlers;
 mod connection;
@@ -17,6 +20,7 @@ pub fn register(config: &mut web::ServiceConfig) {
                     web::scope("")
                         .wrap(Auth)
                         .service(handlers::fetch_runners)
+                        .service(handlers::fetch_runner)
                         .service(handlers::fetch_experiments)
                         .service(handlers::fetch_experiment)
                         .service(handlers::fetch_experiment_jobs)
@@ -26,8 +30,30 @@ pub fn register(config: &mut web::ServiceConfig) {
                         .service(handlers::update_experiment_code)
                         .service(handlers::run_experiment)
                         .service(handlers::delete_experiment)
+                        .service(
+                            web::scope("")
+                                .wrap(AdminUser)
+                                .service(handlers::runner_receiver_values)
+                        )
                 )
         );
+}
+
+#[derive(Debug)]
+pub enum ErrorMessage {
+    UnknownRunner
+}
+
+impl ErrorMessaging for ErrorMessage {
+    fn value(&self) -> HttpError {
+        match self {
+            ErrorMessage::UnknownRunner => HttpError {
+                code: StatusCode::NOT_FOUND,
+                error_code: 100,
+                message: String::from("unknown_runner"),
+            },
+        }
+    }
 }
 
 #[cfg(test)]

@@ -12,7 +12,8 @@ use core::schema::{experiments, jobs, runners};
 use core::types::{DBPool, ModelId};
 use service::{Notification, NotificationKind, NotificationMessage, NotificationServer};
 
-use crate::connection::messages::{DisconnectServerMessage, JoinServerMessage, RunMessage, RunResultMessage};
+use crate::connection::ReceiverValues;
+use crate::connection::messages::{DisconnectServerMessage, JoinServerMessage, RunMessage, RunResultMessage, UpdateRunnerValue};
 use crate::connection::session::Session;
 use crate::models::job::JobStatus;
 
@@ -27,6 +28,7 @@ struct ConnectedRunner {
     active_run: Option<RunExperiment>,
     queue: VecDeque<RunExperiment>,
     state: RunnerState,
+    receiver_values: Option<Vec<u8>>,
 }
 
 #[derive(Message, Clone)]
@@ -192,6 +194,7 @@ impl Handler<JoinServerMessage> for ExperimentServer {
             active_run: None,
             queue: VecDeque::new(),
             state: RunnerState::Initializing,
+            receiver_values: None,
         });
 
         // fetch pending jobs and ,if exist, running job from database
@@ -333,6 +336,22 @@ impl Handler<RunResultMessage> for ExperimentServer {
         }
             .into_actor(self)
             .spawn(ctx);
+    }
+}
+
+impl Handler<ReceiverValues> for ExperimentServer {
+    type Result = <ReceiverValues as Message>::Result;
+    fn handle(&mut self, msg: ReceiverValues, _: &mut Self::Context) -> Self::Result {
+        Ok(self.runners.get(&msg.runner_id).ok_or(())?.receiver_values.clone())
+    }
+}
+
+impl Handler<UpdateRunnerValue> for ExperimentServer {
+    type Result = ();
+    fn handle(&mut self, msg: UpdateRunnerValue, _: &mut Self::Context) -> Self::Result {
+        if let Some(runner) = self.runners.get_mut(&msg.runner_id) {
+            runner.receiver_values = Some(msg.values)
+        }
     }
 }
 
