@@ -1,4 +1,4 @@
-import {AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild} from '@angular/core';
+import {Component, OnDestroy, OnInit} from '@angular/core';
 import {MainComponent} from '../../../shared/components/main/main.component';
 import {ExperimentViewModelService} from '../../../experiment/services/experiment-view-model.service';
 import {ActivatedRoute} from '@angular/router';
@@ -14,19 +14,16 @@ import {line} from 'd3-shape/src/index.js';
   templateUrl: './runner.component.html',
   styleUrls: ['./runner.component.scss']
 })
-export class RunnerComponent extends MainComponent implements OnInit, OnDestroy, AfterViewInit {
-  private static MAX_BUFFER_LENGTH = 10;
+export class RunnerComponent extends MainComponent implements OnInit, OnDestroy {
+  private static MAX_BUFFER_LENGTH = 20;
 
   runner: SlimRunner;
 
   receiverValuesSub: Subscription;
 
-  receivers: number[][] = [];
+  receiverValues: number[][] = [];
 
   formats = formats;
-
-  @ViewChild('canvasElement') canvasElement: ElementRef;
-  @ViewChild('svgElement') svgElement: ElementRef;
 
   get isPageReady(): boolean {
     return !!this.runner;
@@ -53,7 +50,7 @@ export class RunnerComponent extends MainComponent implements OnInit, OnDestroy,
             this.receiverValuesSub.unsubscribe();
           }
 
-          this.receiverValuesSub = interval(5000).pipe(
+          this.receiverValuesSub = interval(2000).pipe(
             switchMap(_ => this.viewModel.runnerReceiversValues(runner.id))
           )
             .subscribe(res => {
@@ -61,15 +58,11 @@ export class RunnerComponent extends MainComponent implements OnInit, OnDestroy,
                 return;
               }
 
-              while (res.values.length > this.receivers.length) {
-                this.receivers.push([]);
-              }
-
-              for (let i = 0; i < res.values.length; i++) {
-                if (this.receivers[i].length > RunnerComponent.MAX_BUFFER_LENGTH) {
-                  this.receivers[i].shift();
-                }
-                this.receivers[i].push(res.values[i] - 50);
+              if (res.values.length !== this.receiverValues.length) {
+                this.receiverValues = res.values.map(v => [v]);
+                this.buildGraphs(this.receiverValues);
+              } else {
+                this.updateGraphs(res.values);
               }
             });
         })
@@ -84,32 +77,41 @@ export class RunnerComponent extends MainComponent implements OnInit, OnDestroy,
     }
   }
 
-  ngAfterViewInit(): void {
-    const svg = this.svgElement.nativeElement;
-    const ctx = this.canvasElement.nativeElement.getContext('2d');
+  buildGraphs(values: number[][]): void {
+    const container = document.getElementById('svg-container');
 
-    const svgLine = line();
+    while (container.firstChild) {
+      container.removeChild(container.lastChild);
+    }
 
-    svg.setAttribute('d', svgLine([
-      [0, 80],
-      [100, 100],
-      [300, 50],
-      [400, 40],
-      [500, 80]
-    ]));
+    // create receiver svgs
+    values.forEach(_ => {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.classList.add('line');
+      container.appendChild(svg);
+    });
 
-    const d3Line = line()
-      .context(ctx);
+    container.childNodes.forEach((node, i) => {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      node.appendChild(path);
 
-    ctx.strokeStyle = '#999';
-    ctx.beginPath();
-    d3Line([
-      [0, 80],
-      [100, 100],
-      [300, 50],
-      [400, 40],
-      [500, 80]
-    ]);
-    ctx.stroke();
+      path.setAttribute('d', line()(values[i].map((v, idx) => [0, v])));
+    });
+  }
+
+  updateGraphs(values: number[]): void {
+    values.forEach((v, i) => {
+      if (this.receiverValues[i].length > RunnerComponent.MAX_BUFFER_LENGTH) {
+        this.receiverValues[i].shift();
+      }
+
+      this.receiverValues[i].push(v);
+    });
+
+    const container = document.getElementById('svg-container');
+
+    container.childNodes.forEach((c, i) => {
+      (c.firstChild as any).setAttribute('d', line()(this.receiverValues[i].map((v, idx) => [idx * 15, v])));
+    });
   }
 }

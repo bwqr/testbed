@@ -11,15 +11,7 @@
         <p>{{runner.name}}</p>
         <p>{{runner.createdAt | date: formats.longDate}}</p>
       </div>
-      <div class="col-md-8">
-      <canvas #canvasElement id="receiver-values" width="400" height="400"></canvas>
-      <svg  id="line">
-        <path #svgElement d=""></path>
-      </svg>
-
-<!--        <ul>-->
-<!--          <li *ngFor="let receiver of receivers"><span *ngFor="let value of receiver">{{value}}</span></li>-->
-<!--        </ul>-->
+      <div class="col-md-8" id="svg-container">
       </div>
     </div>
   </div>
