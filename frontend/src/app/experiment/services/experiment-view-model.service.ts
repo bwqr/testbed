@@ -24,6 +24,10 @@ export class ExperimentViewModelService extends MainViewModelService {
     return this.cacheService.get('experiment.runners', this.requestService.makeGetRequest(routes.experiment.runners));
   }
 
+  runner(id: number): Observable<SlimRunner> {
+    return this.cacheService.get(`experiment.runner.${id}`, this.requestService.makeGetRequest(`${routes.experiment.runner}/${id}`));
+  }
+
   runExperiment(experimentId: number, runnerId: number): Observable<Job> {
     return this.requestService.makePostRequest(`${routes.experiment.experiment}/${experimentId}/run/${runnerId}`, {});
   }

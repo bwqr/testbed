@@ -11,6 +11,7 @@ export const routes = {
   },
   experiment: {
     runners: experiment + '/runners',
+    runner: experiment + '/runner',
     experiments: experiment + '/experiments',
     experiment: experiment + '/experiment',
     job: experiment + '/job'

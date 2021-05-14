@@ -1,0 +1,26 @@
+<div class="container mt-4">
+  <div class="mb-4">
+    <p class="fs-3">Runner - {{ runner ? runner.name : ''}}</p>
+    <hr>
+  </div>
+
+  <div class="bg-white rounded-3 shadow-sm p-md-5 p-3">
+    <div class="row">
+      <div class="col-md-4" *ngIf="isPageReady">
+        <p>{{runner.id}}</p>
+        <p>{{runner.name}}</p>
+        <p>{{runner.createdAt | date: formats.longDate}}</p>
+      </div>
+      <div class="col-md-8">
+      <canvas #canvasElement id="receiver-values" width="400" height="400"></canvas>
+      <svg  id="line">
+        <path #svgElement d=""></path>
+      </svg>
+
+<!--        <ul>-->
+<!--          <li *ngFor="let receiver of receivers"><span *ngFor="let value of receiver">{{value}}</span></li>-->
+<!--        </ul>-->
+      </div>
+    </div>
+  </div>
+</div>

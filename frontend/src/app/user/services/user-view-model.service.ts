@@ -12,7 +12,7 @@ import {SuccessResponse} from '../../core/models';
 })
 export class UserViewModelService extends MainViewModelService {
 
-  $user = new Subject<User>();
+  private $user = new Subject<User>();
 
   constructor(
     protected cacheService: CacheService,

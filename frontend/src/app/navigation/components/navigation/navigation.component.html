@@ -25,17 +25,8 @@
   <aside class="d-flex position-sticky top-0 align-items-center justify-content-center"
          style="height: 100vh; width: 20%">
     <ul class="navbar-nav mr-auto">
-      <li class="nav-item">
-        <a class="nav-link" routerLink="/user/profile">Profile</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" routerLink="/experiment/experiments">Experiments</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" routerLink="/user/settings">Settings</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" routerLink="/auth/logout">Logout</a>
+      <li class="nav-item" *ngFor="let menu of menus">
+        <a class="nav-link" [routerLink]="menu.routerLink">{{menu.text}}</a>
       </li>
     </ul>
   </aside>

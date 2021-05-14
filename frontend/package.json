@@ -25,6 +25,7 @@
     "@codemirror/language": "^0.18.1",
     "@codemirror/view": "^0.18.8",
     "bootstrap": "^5.0.0-beta3",
+    "d3-shape": "^2.1.0",
     "rxjs": "~6.6.0",
     "tslib": "^2.0.0",
     "zone.js": "~0.10.2"

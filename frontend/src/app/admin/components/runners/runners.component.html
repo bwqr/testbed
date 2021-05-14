@@ -1,0 +1,31 @@
+<div class="container mt-4">
+  <div class="mb-4">
+    <p class="fs-3">Runners</p>
+    <hr>
+  </div>
+
+  <div class="bg-white rounded-3 shadow-sm p-md-5 p-3" *ngIf="isPageReady">
+    <table class="table table-hover table-responsive-sm mb-4">
+      <thead>
+      <tr>
+        <th>Id</th>
+        <th>Name</th>
+        <th>Created at</th>
+        <th></th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr *ngFor="let runner of runners">
+        <td><small>{{runner.id}}</small></td>
+        <td><small>{{runner.name}}</small></td>
+        <td><small>{{runner.createdAt | date : formats.shortDate}}</small></td>
+        <td>
+          <a class="btn btn-outline-dark" [routerLink]="['../runner', runner.id]">
+            <small>Details</small>
+          </a>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

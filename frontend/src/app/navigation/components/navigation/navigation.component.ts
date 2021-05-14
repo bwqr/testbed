@@ -4,6 +4,8 @@ import {Alert} from '../../../core/models';
 import {WebSocketService} from '../../../core/services/web-socket.service';
 import {ConnectionStatus, Notification, NotificationKind} from '../../../core/websocket/models';
 import {JobUpdate} from '../../../experiment/models';
+import {UserViewModelService} from '../../../user/services/user-view-model.service';
+import {Role} from '../../../user/models';
 
 @Component({
   selector: 'app-navigation',
@@ -11,6 +13,8 @@ import {JobUpdate} from '../../../experiment/models';
   styleUrls: ['./navigation.component.scss']
 })
 export class NavigationComponent implements OnInit {
+
+  menus = [];
 
   alerts: Alert[] = [];
 
@@ -21,6 +25,7 @@ export class NavigationComponent implements OnInit {
 
   constructor(
     private service: MainService,
+    private userViewModel: UserViewModelService,
     private webSocketService: WebSocketService
   ) {
     this.service.listenAlerts().subscribe(alert => {
@@ -45,6 +50,13 @@ export class NavigationComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.userViewModel.user().subscribe(user => {
+      if (user.roleId === Role.Admin) {
+        this.menus = [profile, experiments, runners, settings, logout];
+      } else {
+        this.menus = [profile, experiments, settings, logout];
+      }
+    });
   }
 
   toggleNavbar(navbarId: string): void {
@@ -67,3 +79,27 @@ export class NavigationComponent implements OnInit {
     this.webSocketService.connect();
   }
 }
+
+const profile = {
+  routerLink: '/user/profile',
+  text: 'Profile',
+};
+const settings = {
+  routerLink: '/user/settings',
+  text: 'Settings',
+};
+
+const experiments = {
+  routerLink: '/experiment/experiments',
+  text: 'Experiments',
+};
+
+const runners = {
+  routerLink: '/admin/runners',
+  text: 'Runners',
+};
+
+const logout = {
+  routerLink: '/auth/logout',
+  text: 'Logout',
+};
