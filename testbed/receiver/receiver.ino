@@ -5,16 +5,15 @@ void setup() {
   Serial.begin(9600);
 
   pinMode(LED_BUILTIN, OUTPUT);
-
-  Serial.print(setupMessage);
+  randomSeed(analogRead(0));
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   digitalWrite(LED_BUILTIN, HIGH);
-  Serial.print(1);
+  Serial.print(random(10));
   delay(500);
   digitalWrite(LED_BUILTIN, LOW);
-  Serial.print(0);
+  Serial.print(random(10));
   delay(500); 
 }
