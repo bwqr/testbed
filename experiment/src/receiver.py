@@ -38,8 +38,6 @@ class Receiver:
         self.connection = Connection(name='connection-thread')
         self.connection.start()
         self.devs = list(map(lambda path: Serial(path, 9600), device_paths))
-        for dev in self.devs:
-            dev.read(len(start_message))
 
     def next(self) -> Tuple[bool, List[int]]:
         read_data = []
