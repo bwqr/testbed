@@ -94,8 +94,8 @@ def run_transmitter():
 def run_receiver(device_paths):
     pass
 
-if __name__ == &#x27;__main__&#x27;:
-    if sys.argv[1] == &#x27;--receiver&#x27;:
+if __name__ == ''__main__'':
+    if sys.argv[1] == ''--receiver'':
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-04-25 11:58:41.265656', '2021-04-25 11:58:41.265656');
@@ -112,8 +112,8 @@ def run_transmitter():
 def run_receiver(device_paths):
     pass
 
-if __name__ == &#x27;__main__&#x27;:
-    if sys.argv[1] == &#x27;--receiver&#x27;:
+if __name__ == ''__main__'':
+    if sys.argv[1] == ''--receiver'':
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-04-18 16:09:36.646962', '2021-04-18 16:09:36.646962');
@@ -126,9 +126,9 @@ from transmitter import State, WordEncoder, Spray
 def run_transmitter():
     state = State(WordEncoder())
     state.execute()
-    print(&quot;&quot;&quot;
-      &lt;script&gt;alert(&#x27;Hacked&#x27;)&lt;/script&gt;
-  &quot;&quot;&quot;)
+    print("""
+      <script>alert(''Hacked'')</script>
+  """)
     raise Exception
 
 
@@ -136,8 +136,8 @@ def run_receiver(device_paths):
     pass
 
 
-if __name__ == &#x27;__main__&#x27;:
-    if sys.argv[1] == &#x27;--receiver&#x27;:
+if __name__ == ''__main__'':
+    if sys.argv[1] == ''--receiver'':
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-04-18 16:04:44.018911', '2021-04-18 16:04:44.018911');
@@ -148,6 +148,7 @@ from transmitter import State, WordEncoder, Spray
 
 def run_transmitter():
     state = State(WordEncoder())
+    state.wait(5000)
     state.execute()
 
 
@@ -155,8 +156,8 @@ def run_receiver(device_paths):
     raise Exception
 
 
-if __name__ == &#x27;__main__&#x27;:
-    if sys.argv[1] == &#x27;--receiver&#x27;:
+if __name__ == ''__main__'':
+    if sys.argv[1] == ''--receiver'':
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-04-25 11:58:01.943044', '2021-04-25 11:58:01.943044');
@@ -181,8 +182,8 @@ def run_receiver(device_paths):
     return
 
 
-if __name__ == &#x27;__main__&#x27;:
-    if sys.argv[1] == &#x27;--receiver&#x27;:
+if __name__ == ''__main__'':
+    if sys.argv[1] == ''--receiver'':
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-04-25 11:54:01.737986', '2021-04-25 11:54:01.737986');
@@ -223,15 +224,17 @@ import time
 
 def run_transmitter():
     state = State(WordEncoder())
+    state.wait(5000)
     state.execute()
 
 
 def run_receiver(device_paths):
-    time.sleep(15)
+    receiver = Receiver(device_paths)
+    time.sleep(20)
 
 
-if __name__ == &#x27;__main__&#x27;:
-    if sys.argv[1] == &#x27;--receiver&#x27;:
+if __name__ == ''__main__'':
+    if sys.argv[1] == ''--receiver'':
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-04-25 11:52:50.821539', '2021-04-25 11:52:50.821539');
