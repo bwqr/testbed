@@ -229,13 +229,17 @@ impl Executor {
 
     fn handle_execution(&self, job_id: ModelId, code: String) -> Result<String, Error> {
         let script_dir = Self::gen_tmp_dir(job_id);
+        info!("generated tmp dirs");
 
         Self::create_dir_and_files(script_dir.as_str(), code)?;
+        info!("created dirsand files");
 
         let state = Decoder::decode(
             self.run_transmitter_code(script_dir.as_str())?.as_str()
         )
             .map_err(|e| Error::Custom(format!("Unable to decode state, {:?}", e)))?;
+
+        info!("decoded the state");
 
         // apply sanity checks
         let execution_time = state.execution_time();
@@ -247,13 +251,18 @@ impl Executor {
         if emit_time > limits::MAX_EMIT_TIME {
             return Err(Error::Custom(format!("Max emit time is reached, emit time: {}", emit_time)));
         }
+        info!("applied sanity checks");
 
         let mut port = self.start_transmitter()?;
+        info!("started the transmitter");
 
         let mut child = self.start_receiver(script_dir.as_str())?;
+        info!("started the receiver");
 
         match self.run_commands(state, &mut port, &mut child) {
             Ok(ExitReason::EndOfExperiment) => {
+                info!("experiment is ended");
+
                 std::net::TcpStream::connect("127.0.0.1:8011")
                     .map_err(|_| {
                         let _ = child.kill();
@@ -269,6 +278,7 @@ impl Executor {
                 for _ in 0..10 {
                     match child.try_wait() {
                         Ok(Some(status)) => {
+                            info!("child is exited");
                             exited = true;
 
                             // if not successful, gather the outputs
@@ -293,14 +303,18 @@ impl Executor {
 
                 if !exited {
                     let _ = child.kill();
+                    info!("child is killed");
                     return Err(Error::Custom(String::from("receiver code did not exit in 10 seconds")));
                 }
             }
             Ok(ExitReason::ChildExit(status)) => {
+                info!("child exited before experiment end");
+
                 // user receiver code should not exit until receiving an END_MESSAGE over tcp
                 if status.success() {
                     return Err(Error::Custom(String::from("User receiver code exited successfully without waiting end of experiment, this should not be the case")));
                 }
+                info!("child crashed");
 
                 // if not successful, gather the outputs
                 let mut output = String::new();
@@ -312,6 +326,7 @@ impl Executor {
                 return Err(Error::Output(output));
             }
             Err(e) => {
+                info!("unknown error while waiting for child exit");
                 // just kill everything without checking error and return error
                 let _ = port.write(END_DELIMITER_NEW_LINE.as_bytes());
                 let _ = child.kill();
@@ -323,8 +338,10 @@ impl Executor {
         let mut output = String::new();
         child.stdout.unwrap().read_to_string(&mut output)
             .map_err(|e| Error::IO(e))?;
+        info!("output is generated");
 
         self.remove_dir(script_dir.as_str())?;
+        info!("tmp dirs removed");
 
         Ok(output)
     }
