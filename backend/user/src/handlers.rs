@@ -1,4 +1,4 @@
-use actix_web::{get, HttpResponse, put, Result, web};
+use actix_web::{get, put, Result, web, web::Json};
 use diesel::prelude::*;
 
 use core::responses::SuccessResponse;
@@ -11,12 +11,12 @@ use crate::models::user::User;
 use crate::requests::{UpdatePasswordRequest, UpdateProfileRequest};
 
 #[get("/profile")]
-pub async fn fetch_profile(user: User) -> Result<HttpResponse> {
-    Ok(HttpResponse::Ok().json(user))
+pub async fn fetch_profile(user: User) -> Result<Json<User>> {
+    Ok(Json(user))
 }
 
 #[put("/profile")]
-pub async fn update_profile(pool: web::Data<DBPool>, user: User, request: SanitizedJson<UpdateProfileRequest>) -> Result<HttpResponse> {
+pub async fn update_profile(pool: web::Data<DBPool>, user: User, request: SanitizedJson<UpdateProfileRequest>) -> Result<Json<SuccessResponse>> {
     let conn = pool.get().unwrap();
 
     web::block(move ||
@@ -26,11 +26,11 @@ pub async fn update_profile(pool: web::Data<DBPool>, user: User, request: Saniti
     )
         .await?;
 
-    Ok(HttpResponse::Ok().json(SuccessResponse::default()))
+    Ok(Json(SuccessResponse::default()))
 }
 
 #[put("/password")]
-pub async fn update_password(pool: web::Data<DBPool>, hash: web::Data<Hash>, user: User, request: web::Json<UpdatePasswordRequest>) -> Result<HttpResponse> {
+pub async fn update_password(pool: web::Data<DBPool>, hash: web::Data<Hash>, user: User, request: web::Json<UpdatePasswordRequest>) -> Result<Json<SuccessResponse>> {
     let conn = pool.get().unwrap();
 
     web::block(move || {
@@ -42,5 +42,5 @@ pub async fn update_password(pool: web::Data<DBPool>, hash: web::Data<Hash>, use
     })
         .await?;
 
-    Ok(HttpResponse::Ok().json(SuccessResponse::default()))
+    Ok(Json(SuccessResponse::default()))
 }

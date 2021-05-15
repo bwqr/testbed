@@ -1,19 +1,18 @@
 use actix::Addr;
-use actix_web::{delete, get, HttpRequest, HttpResponse, post, put, web};
+use actix_web::{delete, get, HttpRequest, HttpResponse, post, put, web, web::Json};
 use actix_web_actors::ws;
 use diesel::prelude::*;
-use diesel::result::Error;
 use log::error;
 use serde_json::json;
 
 use core::db::DieselEnum;
 use core::error::ErrorMessaging;
 use core::ErrorMessage as CoreErrorMessage;
-use core::models::paginate::{CountStarOver, Paginate, PaginationRequest};
+use core::models::paginate::{CountStarOver, Paginate, Pagination, PaginationRequest};
 use core::responses::{SuccessResponse, TokenResponse};
 use core::sanitized::SanitizedJson;
 use core::schema::{experiments, jobs, runners};
-use core::types::{DBPool, DefaultResponse, ModelId};
+use core::types::{DBPool, DefaultResponse, ModelId, Result};
 use core::utils::Hash;
 use user::models::user::User;
 
@@ -51,7 +50,7 @@ pub async fn join_server(
 }
 
 #[get("runners")]
-pub async fn fetch_runners(pool: web::Data<DBPool>) -> DefaultResponse {
+pub async fn fetch_runners(pool: web::Data<DBPool>) -> Result<Json<Vec<SlimRunner>>> {
     let conn = pool.get().unwrap();
 
     let runners = web::block(move ||
@@ -61,11 +60,11 @@ pub async fn fetch_runners(pool: web::Data<DBPool>) -> DefaultResponse {
     )
         .await?;
 
-    Ok(HttpResponse::Ok().json(runners))
+    Ok(Json(runners))
 }
 
 #[get("runner/{id}")]
-pub async fn fetch_runner(pool: web::Data<DBPool>, runner_id: web::Path<ModelId>) -> DefaultResponse {
+pub async fn fetch_runner(pool: web::Data<DBPool>, runner_id: web::Path<ModelId>) -> Result<Json<SlimRunner>> {
     let conn = pool.get().unwrap();
 
     let runner = web::block(move ||
@@ -76,7 +75,7 @@ pub async fn fetch_runner(pool: web::Data<DBPool>, runner_id: web::Path<ModelId>
     )
         .await?;
 
-    Ok(HttpResponse::Ok().json(runner))
+    Ok(Json(runner))
 }
 
 #[get("runner/{id}/values")]
@@ -92,7 +91,7 @@ pub async fn runner_receiver_values(experiment_server: web::Data<Addr<Experiment
 }
 
 #[get("experiments")]
-pub async fn fetch_experiments(pool: web::Data<DBPool>, user: User, pagination: web::Query<PaginationRequest>) -> DefaultResponse {
+pub async fn fetch_experiments(pool: web::Data<DBPool>, user: User, pagination: web::Query<PaginationRequest>) -> Result<Json<Pagination<SlimExperiment>>> {
     let conn = pool.get().unwrap();
 
     let experiments = web::block(move || experiments::table
@@ -105,11 +104,11 @@ pub async fn fetch_experiments(pool: web::Data<DBPool>, user: User, pagination: 
     )
         .await?;
 
-    Ok(HttpResponse::Ok().json(experiments))
+    Ok(Json(experiments))
 }
 
 #[get("experiment/{id}")]
-pub async fn fetch_experiment(pool: web::Data<DBPool>, experiment_id: web::Path<ModelId>, user: User) -> DefaultResponse {
+pub async fn fetch_experiment(pool: web::Data<DBPool>, experiment_id: web::Path<ModelId>, user: User) -> Result<Json<Experiment>> {
     let conn = pool.get().unwrap();
 
     let experiment = web::block(move ||
@@ -120,14 +119,14 @@ pub async fn fetch_experiment(pool: web::Data<DBPool>, experiment_id: web::Path<
     )
         .await?;
 
-    Ok(HttpResponse::Ok().json(experiment))
+    Ok(Json(experiment))
 }
 
 #[get("experiment/{id}/jobs")]
-pub async fn fetch_experiment_jobs(pool: web::Data<DBPool>, experiment_id: web::Path<ModelId>, user: User, pagination: web::Query<PaginationRequest>) -> DefaultResponse {
+pub async fn fetch_experiment_jobs(pool: web::Data<DBPool>, experiment_id: web::Path<ModelId>, user: User, pagination: web::Query<PaginationRequest>) -> Result<Json<Pagination<(SlimJob, SlimRunner)>>> {
     let conn = pool.get().unwrap();
 
-    let jobs = web::block(move || -> Result<_, Error>{
+    let jobs = web::block(move || {
         let experiment = experiments::table
             .filter(experiments::user_id.eq(user.id))
             .find(experiment_id.into_inner())
@@ -144,11 +143,11 @@ pub async fn fetch_experiment_jobs(pool: web::Data<DBPool>, experiment_id: web::
     })
         .await?;
 
-    Ok(HttpResponse::Ok().json(jobs))
+    Ok(Json(jobs))
 }
 
 #[get("job/{id}")]
-pub async fn fetch_job(pool: web::Data<DBPool>, job_id: web::Path<ModelId>, user: User) -> DefaultResponse {
+pub async fn fetch_job(pool: web::Data<DBPool>, job_id: web::Path<ModelId>, user: User) -> Result<Json<(Job, SlimRunner)>> {
     let conn = pool.get().unwrap();
 
     let job = web::block(move ||
@@ -162,11 +161,11 @@ pub async fn fetch_job(pool: web::Data<DBPool>, job_id: web::Path<ModelId>, user
     )
         .await?;
 
-    Ok(HttpResponse::Ok().json(job))
+    Ok(Json(job))
 }
 
 #[post("experiment")]
-pub async fn create_new_experiment(pool: web::Data<DBPool>, user: User, request: SanitizedJson<ExperimentNameRequest>) -> DefaultResponse {
+pub async fn create_new_experiment(pool: web::Data<DBPool>, user: User, request: SanitizedJson<ExperimentNameRequest>) -> Result<Json<Experiment>> {
     let conn = pool.get().unwrap();
     let request = request.into_inner();
 
@@ -178,14 +177,14 @@ pub async fn create_new_experiment(pool: web::Data<DBPool>, user: User, request:
     )
         .await?;
 
-    Ok(HttpResponse::Ok().json(experiment))
+    Ok(Json(experiment))
 }
 
 /// This will return a SuccessResponse even though update may not occur if experiment's user id is not
 /// equal to user.id. Update endpoints will generally behave like this.
 #[put("experiment/{id}")]
 pub async fn update_experiment_name(pool: web::Data<DBPool>, experiment_id: web::Path<ModelId>, user: User, request: SanitizedJson<ExperimentNameRequest>)
-                                    -> DefaultResponse {
+                                    -> Result<Json<SuccessResponse>> {
     let conn = pool.get().unwrap();
 
     web::block(move ||
@@ -199,26 +198,7 @@ pub async fn update_experiment_name(pool: web::Data<DBPool>, experiment_id: web:
     )
         .await?;
 
-    Ok(HttpResponse::Ok().json(SuccessResponse::default()))
-}
-
-#[put("experiment/{id}/code")]
-pub async fn update_experiment_code(pool: web::Data<DBPool>, experiment_id: web::Path<ModelId>, user: User, request: SanitizedJson<ExperimentCodeRequest>)
-                                    -> DefaultResponse {
-    let conn = pool.get().unwrap();
-
-    web::block(move ||
-        diesel::update(
-            experiments::table
-                .filter(experiments::user_id.eq(user.id))
-                .find(experiment_id.into_inner())
-        )
-            .set(experiments::code.eq(request.into_inner().code))
-            .execute(&conn)
-    )
-        .await?;
-
-    Ok(HttpResponse::Ok().json(SuccessResponse::default()))
+    Ok(Json(SuccessResponse::default()))
 }
 
 #[post("experiment/{experiment_id}/run/{runner_id}")]
@@ -227,7 +207,7 @@ pub async fn run_experiment(
     experiment_server: web::Data<Addr<ExperimentServer>>,
     ids: web::Path<(ModelId, ModelId)>,
     user: User,
-) -> DefaultResponse {
+) -> Result<Json<Job>> {
     let conn = pool.get().unwrap();
     let (experiment_id, runner_id) = ids.into_inner();
     let user_id = user.id;
@@ -266,13 +246,32 @@ pub async fn run_experiment(
         job.status = JobStatus::Failed;
     }
 
-    Ok(HttpResponse::Ok().json(job))
+    Ok(Json(job))
+}
+
+#[put("experiment/{id}/code")]
+pub async fn update_experiment_code(pool: web::Data<DBPool>, experiment_id: web::Path<ModelId>, user: User, request: SanitizedJson<ExperimentCodeRequest>)
+                                    -> Result<Json<SuccessResponse>> {
+    let conn = pool.get().unwrap();
+
+    web::block(move ||
+        diesel::update(
+            experiments::table
+                .filter(experiments::user_id.eq(user.id))
+                .find(experiment_id.into_inner())
+        )
+            .set(experiments::code.eq(request.into_inner().code))
+            .execute(&conn)
+    )
+        .await?;
+
+    Ok(Json(SuccessResponse::default()))
 }
 
 /// This will return a SuccessResponse even though delete may not occur if experiment's user id is not
 /// equal to user.id. Delete endpoints will generally behave like this.
 #[delete("experiment/{id}")]
-pub async fn delete_experiment(pool: web::Data<DBPool>, experiment_id: web::Path<ModelId>, user: User) -> DefaultResponse {
+pub async fn delete_experiment(pool: web::Data<DBPool>, experiment_id: web::Path<ModelId>, user: User) -> Result<Json<SuccessResponse>> {
     let conn = pool.get().unwrap();
 
     web::block(move ||
@@ -284,5 +283,5 @@ pub async fn delete_experiment(pool: web::Data<DBPool>, experiment_id: web::Path
     )
         .await?;
 
-    Ok(HttpResponse::Ok().json(SuccessResponse::default()))
+    Ok(Json(SuccessResponse::default()))
 }

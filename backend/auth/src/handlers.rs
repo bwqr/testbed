@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use actix_web::{HttpResponse, post, put, web};
+use actix_web::{post, put, web, web::Json};
 use askama::Template;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error};
@@ -26,7 +26,7 @@ use crate::templates::{ForgotPasswordMailTemplate, ResetPasswordMailTemplate, Ve
 const TIMEOUT: i64 = 60 * 60 * 24;
 
 #[post("/login")]
-pub async fn login(pool: web::Data<DBPool>, hash: web::Data<Hash>, request: SanitizedJson<LoginRequest>) -> Result<HttpResponse, Box<dyn ErrorMessaging>> {
+pub async fn login(pool: web::Data<DBPool>, hash: web::Data<Hash>, request: SanitizedJson<LoginRequest>) -> Result<Json<TokenResponse>, Box<dyn ErrorMessaging>> {
     let conn = pool.get().unwrap();
     let hash = hash.into_inner();
     let request = request.into_inner();
@@ -55,9 +55,7 @@ pub async fn login(pool: web::Data<DBPool>, hash: web::Data<Hash>, request: Sani
 
     let token = hash.encode(&AuthToken::new(user.id, user.role_id, TIMEOUT))?;
 
-    let token = TokenResponse { token };
-
-    Ok(HttpResponse::Ok().json(token))
+    Ok(Json(TokenResponse { token }))
 }
 
 #[post("/sign-up")]
@@ -67,8 +65,7 @@ pub async fn sign_up(
     config: web::Data<Arc<Config>>,
     client_services: web::Data<ClientServices>,
     request: SanitizedJson<SignUpRequest>,
-)
-    -> Result<HttpResponse, Box<dyn ErrorMessaging>> {
+) -> Result<Json<SuccessResponse>, Box<dyn ErrorMessaging>> {
     let conn = pool.get().unwrap();
     let hash = hash.into_inner();
     let request = request.into_inner();
@@ -122,7 +119,7 @@ pub async fn sign_up(
 
     client_services.mail.send_mail(user.email, full_name, text);
 
-    Ok(HttpResponse::Ok().json(SuccessResponse::default()))
+    Ok(Json(SuccessResponse::default()))
 }
 
 #[post("/forgot-password")]
@@ -132,7 +129,7 @@ pub async fn forgot_password(
     config: web::Data<Arc<Config>>,
     client_services: web::Data<ClientServices>,
     request: SanitizedJson<ForgotPasswordRequest>,
-) -> Result<HttpResponse, Box<dyn ErrorMessaging>> {
+) -> Result<Json<SuccessResponse>, Box<dyn ErrorMessaging>> {
     let conn = pool.get().unwrap();
     let request = request.into_inner();
 
@@ -155,7 +152,7 @@ pub async fn forgot_password(
 
     client_services.mail.send_mail(user.full_name(), user.email, text);
 
-    Ok(HttpResponse::Ok().json(SuccessResponse::default()))
+    Ok(Json(SuccessResponse::default()))
 }
 
 #[put("/reset-password")]
@@ -164,7 +161,7 @@ pub async fn reset_password(
     pool: web::Data<DBPool>,
     client_services: web::Data<ClientServices>,
     request: SanitizedJson<ResetPasswordRequest>,
-) -> Result<HttpResponse, Box<dyn ErrorMessaging>> {
+) -> Result<Json<SuccessResponse>, Box<dyn ErrorMessaging>> {
     let conn = pool.get().unwrap();
 
     let request = request.into_inner();
@@ -200,7 +197,7 @@ pub async fn reset_password(
     client_services.mail.send_mail(user.full_name(), user.email, text);
 
 
-    Ok(HttpResponse::Ok().json(SuccessResponse::default()))
+    Ok(Json(SuccessResponse::default()))
 }
 
 #[post("verify-account")]
@@ -208,7 +205,7 @@ pub async fn verify_account(
     hash: web::Data<Hash>,
     pool: web::Data<DBPool>,
     request: SanitizedJson<VerifyAccountRequest>,
-) -> Result<HttpResponse, Box<dyn ErrorMessaging>> {
+) -> Result<Json<SuccessResponse>, Box<dyn ErrorMessaging>> {
     let conn = pool.get().unwrap();
 
     let verify_account_token = hash.decode::<IdentityToken>(request.0.token.as_str())
@@ -233,5 +230,5 @@ pub async fn verify_account(
     })
         .await?;
 
-    Ok(HttpResponse::Ok().json(SuccessResponse::default()))
+    Ok(Json(SuccessResponse::default()))
 }
