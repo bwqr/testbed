@@ -1,3 +1,13 @@
+CREATE FUNCTION update_timestamp() RETURNS TRIGGER
+    LANGUAGE plpgsql
+AS
+$$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$;
+
 -- Your SQL goes here
 create table roles
 (
@@ -21,8 +31,8 @@ create table users
     CONSTRAINT user_role_id FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-insert into users (id, first_name, last_name, email, password, status, role_id)
-values (1, 'My FirstName', 'My LastName', 'hola@email.com',
+insert into users (first_name, last_name, email, password, status, role_id)
+values ('My FirstName', 'My LastName', 'hola@email.com',
         'KzOo58lsjoE3cWBEDuYlh5/4b1SxQMezrHt7UqM2H+xI/YwdOGq7SzDqFp6uA0YrPc9l5x9qRoGeMJklcQWinw==', 'Verified', 2);
 
 create table experiments
@@ -35,6 +45,12 @@ create table experiments
     updated_at timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT experiment_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
+
+create trigger experiments_updated_at
+    before update
+    on experiments
+    for each row
+execute procedure update_timestamp();
 
 create table runners
 (
@@ -58,5 +74,164 @@ create table jobs
     CONSTRAINT job_runner_id FOREIGN KEY (runner_id) REFERENCES runners (id) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
+create trigger jobs_updated_at
+    before update
+    on jobs
+    for each row
+execute procedure update_timestamp();
+
 insert into runners (name, access_key)
-values ('NanoNetworking Testbed', 'runner_1')
+values ('NanoNetworking Testbed', 'runner_1');
+
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'transmitter crash', 'import sys
+from random import random
+from receiver import Receiver
+from transmitter import State, WordEncoder, Spray
+
+def run_transmitter():
+    raise Exception
+
+def run_receiver(device_paths):
+    pass
+
+if __name__ == &#x27;__main__&#x27;:
+    if sys.argv[1] == &#x27;--receiver&#x27;:
+        run_receiver(sys.argv[2:])
+    else:
+        run_transmitter()', '2021-04-25 11:58:41.265656', '2021-04-25 11:58:41.265656');
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'transmitter ddos', 'import sys
+from random import random
+from receiver import Receiver
+from transmitter import State, WordEncoder, Spray
+import time
+
+def run_transmitter():
+    time.sleep(15)
+
+
+def run_receiver(device_paths):
+    pass
+
+if __name__ == &#x27;__main__&#x27;:
+    if sys.argv[1] == &#x27;--receiver&#x27;:
+        run_receiver(sys.argv[2:])
+    else:
+        run_transmitter()', '2021-04-18 16:09:36.646962', '2021-04-18 16:09:36.646962');
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'output xss hacking', 'import sys
+from random import random
+from receiver import Receiver
+from transmitter import State, WordEncoder, Spray
+
+
+def run_transmitter():
+    state = State(WordEncoder())
+    state.execute()
+    print(&quot;&quot;&quot;
+      &lt;script&gt;alert(&#x27;Hacked&#x27;)&lt;/script&gt;
+  &quot;&quot;&quot;)
+    raise Exception
+
+
+def run_receiver(device_paths):
+    pass
+
+
+if __name__ == &#x27;__main__&#x27;:
+    if sys.argv[1] == &#x27;--receiver&#x27;:
+        run_receiver(sys.argv[2:])
+    else:
+        run_transmitter()', '2021-04-18 16:04:44.018911', '2021-04-18 16:04:44.018911');
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'receiver crash', 'import sys
+from random import random
+from receiver import Receiver
+from transmitter import State, WordEncoder, Spray
+
+def run_transmitter():
+    state = State(WordEncoder())
+    state.execute()
+
+
+def run_receiver(device_paths):
+    raise Exception
+
+
+if __name__ == &#x27;__main__&#x27;:
+    if sys.argv[1] == &#x27;--receiver&#x27;:
+        run_receiver(sys.argv[2:])
+    else:
+        run_transmitter()', '2021-04-25 11:58:01.943044', '2021-04-25 11:58:01.943044');
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'receiver exit without waiting experiment end', 'import sys
+from random import random
+from receiver import Receiver
+from transmitter import State, WordEncoder, Spray
+
+def run_transmitter():
+    spray_duration = 20  # ms
+    pause_duration = 25  # ms
+
+    state = State(WordEncoder())
+    for i in range(0, 25):
+        state.emit([Spray.Spray_1], spray_duration * i)
+        state.wait(pause_duration * i)
+
+    state.execute()
+
+
+def run_receiver(device_paths):
+    return
+
+
+if __name__ == &#x27;__main__&#x27;:
+    if sys.argv[1] == &#x27;--receiver&#x27;:
+        run_receiver(sys.argv[2:])
+    else:
+        run_transmitter()', '2021-04-25 11:54:01.737986', '2021-04-25 11:54:01.737986');
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'normal', 'import sys
+from random import random
+from receiver import Receiver
+from transmitter import State, WordEncoder, Spray
+
+
+def run_transmitter():
+    spray_duration = 20  # ms
+    pause_duration = 25  # ms
+
+    state = State(WordEncoder())
+    for i in range(0, 25):
+        state.emit([Spray.Spray_1], spray_duration * i)
+        state.wait(pause_duration)
+    state.execute()
+
+
+def run_receiver(device_paths):
+    receiver = Receiver(device_paths)
+    ended, rx = receiver.next()
+    while not ended:
+       print(rx)
+       ended, rx = receiver.next()
+
+if __name__ == &#x27;__main__&#x27;:
+    if sys.argv[1] == &#x27;--receiver&#x27;:
+        run_receiver(sys.argv[2:])
+    else:
+        run_transmitter()', '2021-03-24 13:16:35.128303', '2021-03-24 13:16:35.128303');
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'receiver ddos', 'import sys
+from random import random
+from receiver import Receiver
+from transmitter import State, WordEncoder, Spray
+import time
+
+def run_transmitter():
+    state = State(WordEncoder())
+    state.execute()
+
+
+def run_receiver(device_paths):
+    time.sleep(15)
+
+
+if __name__ == &#x27;__main__&#x27;:
+    if sys.argv[1] == &#x27;--receiver&#x27;:
+        run_receiver(sys.argv[2:])
+    else:
+        run_transmitter()', '2021-04-25 11:52:50.821539', '2021-04-25 11:52:50.821539');
