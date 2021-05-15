@@ -8,7 +8,8 @@ use log::{error, info};
 use serial::core::SerialDevice;
 
 use crate::connection::Connection;
-use crate::messages::{RunnerReceiversValueMessage, RunMessage, RunResultMessage};
+use crate::executor::limits::{MAX_CPU_CORE, MAX_MEMORY_USAGE};
+use crate::messages::{RunMessage, RunnerReceiversValueMessage, RunResultMessage};
 use crate::ModelId;
 use crate::state::{Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, State};
 
@@ -22,6 +23,10 @@ mod limits {
     pub const MAX_EXECUTION_TIME: u32 = 50000;
     // in milliseconds
     pub const MAX_EMIT_TIME: u32 = 10000;
+    // in MB
+    pub const MAX_MEMORY_USAGE: u32 = 512;
+    // number of core
+    pub const MAX_CPU_CORE: u32 = 1;
 }
 
 mod incoming {
@@ -80,7 +85,7 @@ impl Executor {
 
     fn run_transmitter_code(&self, script_dir: &str) -> Result<String, Error> {
         let mut child = std::process::Command::new(self.docker_path.as_str())
-            .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1"])
+            .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
             .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
@@ -137,7 +142,7 @@ impl Executor {
             .collect::<Vec<String>>();
 
         std::process::Command::new(self.docker_path.as_str())
-            .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1", "-p", "8011:8011"])
+            .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1", "-p", "8011:8011", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
             .args(&devices)
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
@@ -228,20 +233,21 @@ impl Executor {
     }
 
     fn handle_execution(&self, job_id: ModelId, code: String) -> Result<String, Error> {
+        info!("generating tmp dirs");
         let script_dir = Self::gen_tmp_dir(job_id);
-        info!("generated tmp dirs");
 
+        info!("creating dirs and files");
         Self::create_dir_and_files(script_dir.as_str(), code)?;
-        info!("created dirsand files");
 
-        let state = Decoder::decode(
-            self.run_transmitter_code(script_dir.as_str())?.as_str()
-        )
+        info!("running the transmitter code");
+        let serialized_state = self.run_transmitter_code(script_dir.as_str())?;
+
+        info!("decoding the state");
+        let state = Decoder::decode(serialized_state.as_str())
             .map_err(|e| Error::Custom(format!("Unable to decode state, {:?}", e)))?;
 
-        info!("decoded the state");
-
         // apply sanity checks
+        info!("applying sanity checks");
         let execution_time = state.execution_time();
         if execution_time > limits::MAX_EXECUTION_TIME {
             return Err(Error::Custom(format!("Max execution time is reached, execution time: {}", execution_time)));
@@ -251,14 +257,14 @@ impl Executor {
         if emit_time > limits::MAX_EMIT_TIME {
             return Err(Error::Custom(format!("Max emit time is reached, emit time: {}", emit_time)));
         }
-        info!("applied sanity checks");
 
+        info!("starting the transmitter");
         let mut port = self.start_transmitter()?;
-        info!("started the transmitter");
 
+        info!("starting the receiver");
         let mut child = self.start_receiver(script_dir.as_str())?;
-        info!("started the receiver");
 
+        info!("running commands");
         match self.run_commands(state, &mut port, &mut child) {
             Ok(ExitReason::EndOfExperiment) => {
                 info!("experiment is ended");
@@ -302,8 +308,8 @@ impl Executor {
                 }
 
                 if !exited {
+                    info!("killing the child");
                     let _ = child.kill();
-                    info!("child is killed");
                     return Err(Error::Custom(String::from("receiver code did not exit in 10 seconds")));
                 }
             }
@@ -326,7 +332,7 @@ impl Executor {
                 return Err(Error::Output(output));
             }
             Err(e) => {
-                info!("unknown error while waiting for child exit");
+                error!("unknown error while waiting for child exit");
                 // just kill everything without checking error and return error
                 let _ = port.write(END_DELIMITER_NEW_LINE.as_bytes());
                 let _ = child.kill();
@@ -336,13 +342,14 @@ impl Executor {
         }
 
         let mut output = String::new();
+        info!("generating the output");
         child.stdout.unwrap().read_to_string(&mut output)
             .map_err(|e| Error::IO(e))?;
-        info!("output is generated");
 
+        info!("removing script dir");
         self.remove_dir(script_dir.as_str())?;
-        info!("tmp dirs removed");
 
+        info!("returning");
         Ok(output)
     }
 }
@@ -414,6 +421,7 @@ impl Handler<RunMessage> for Executor {
         let (output, successful) = match self.handle_execution(msg.job_id, msg.code) {
             Ok(output) => (output, true),
             Err(e) => {
+                info!("failed to execute experiment, {:?}", e);
                 // just try to remove script files, even error originated from remove_script_files, we should try it.
                 let _ = self.remove_dir(Self::gen_tmp_dir(job_id).as_str());
 
