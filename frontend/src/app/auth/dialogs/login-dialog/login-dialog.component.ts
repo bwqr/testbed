@@ -37,6 +37,8 @@ export class LoginDialogComponent extends MainComponent implements OnInit {
       email: formBuilder.control('', [Validators.required, Validators.email]),
       password: formBuilder.control('', [Validators.required])
     });
+
+    this.viewModel.logout();
   }
 
   ngOnInit(): void {

@@ -38,13 +38,13 @@ export class NavigationComponent extends MainComponent implements OnInit {
       setTimeout(() => this.removeAlert(alert), alert.timeout ?? 2500);
     });
 
-    this.webSocketService.listenConnectionStatus().subscribe(status => this.connectionStatus = status);
+    this.subs.add(this.webSocketService.listenConnectionStatus().subscribe(status => this.connectionStatus = status));
 
-    this.webSocketService.willReconnectIn().subscribe(time => this.willReconnectIn = time);
+    this.subs.add(this.webSocketService.willReconnectIn().subscribe(time => this.willReconnectIn = time));
 
-    this.webSocketService.listenNotifications().subscribe(notification => {
+    this.subs.add(this.webSocketService.listenNotifications().subscribe(notification => {
       this.service.alertSuccess(NavigationComponent.getNotificationMessage(notification));
-    });
+    }));
   }
 
   private static getNotificationMessage(notification: Notification<any>): string {

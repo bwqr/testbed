@@ -54,7 +54,7 @@ export class ExperimentComponent extends MainComponent implements OnInit {
       runnerId: formBuilder.control('', [Validators.required]),
     });
 
-    this.webSocketService.listenNotifications().pipe(
+    this.subs.add(this.webSocketService.listenNotifications().pipe(
       filter(notification => notification.message.kind === NotificationKind.JobUpdate),
       map(notification => notification.message.data as JobUpdate)
     ).subscribe(notification => {
@@ -63,7 +63,7 @@ export class ExperimentComponent extends MainComponent implements OnInit {
       if (index > -1) {
         this.jobs.items[index][0].status = notification.status;
       }
-    });
+    }));
   }
 
   ngOnInit(): void {
