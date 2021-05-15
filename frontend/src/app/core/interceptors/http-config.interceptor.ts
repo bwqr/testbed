@@ -10,22 +10,15 @@ import {routes} from '../../routes';
 
 @Injectable()
 export class HttpConfigInterceptor implements HttpInterceptor {
-  loginUrl: string;
-
   constructor(
     private router: Router,
     private requestFailService: RequestFailService,
     private httpHandler: HttpHandler
   ) {
-    // Recursion issue can occur.
-    this.requestFailService.retryFailedRequests.subscribe((retryRequest: RetryRequest) => {
-        this.intercept(retryRequest.req, this.httpHandler).subscribe(response => {
-          retryRequest.subject.next(response);
-        });
-      }
+    // Recursion issue can occur. Nested subscribe is not a good sign, need to improve this segment of the code.
+    this.requestFailService.retryFailedRequests.subscribe((retryRequest: RetryRequest) =>
+      this.intercept(retryRequest.req, this.httpHandler).subscribe(response => retryRequest.subject.next(response))
     );
-
-    this.loginUrl = routes.auth.login;
   }
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
@@ -50,7 +43,7 @@ export class HttpConfigInterceptor implements HttpInterceptor {
         const navigated = this.router.navigated;
         const notLoginPage = this.router.url.indexOf('/auth/login') === -1;
         const notLoginPopup = this.router.url.indexOf('(auth:popup)') === -1;
-        const notLoginRequest = req.url.indexOf(this.loginUrl) === -1;
+        const notLoginRequest = req.url.indexOf(routes.auth.login) === -1;
 
         const shouldRetryRequest = navigated && notLoginRequest && notLoginPage;
         const shouldNavigateLoginPopup = navigated && notLoginPage && notLoginPopup;
