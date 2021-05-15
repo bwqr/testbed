@@ -2,7 +2,7 @@ import {Injectable} from '@angular/core';
 import {CacheService} from '../../core/services/cache.service';
 import {MainRequestService} from '../../core/services/main-request.service';
 import {MainViewModelService} from '../../core/services/main-view-model.service';
-import {Observable, Subject} from 'rxjs';
+import {Observable} from 'rxjs';
 import {User} from '../models';
 import {routes} from '../../routes';
 import {SuccessResponse} from '../../core/models';
@@ -11,8 +11,6 @@ import {SuccessResponse} from '../../core/models';
   providedIn: 'root'
 })
 export class UserViewModelService extends MainViewModelService {
-
-  private $user = new Subject<User>();
 
   constructor(
     protected cacheService: CacheService,

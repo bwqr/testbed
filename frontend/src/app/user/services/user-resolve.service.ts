@@ -15,6 +15,6 @@ export class UserResolveService implements Resolve<User> {
   }
 
   resolve(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): Observable<User> | Promise<User> | any {
-    return this.viewModel.user().toPromise();
+    return this.viewModel.user();
   }
 }

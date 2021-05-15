@@ -4,10 +4,10 @@ import {RetryRequest} from '../models';
 
 
 /**
- * This service responsibility is to set a bridge between Auth::LoginPopupComponent and Core::HttpConfigInterceptor.
- * When an user gets 401 error response from server, interceptor will redirect to LoginPopup as outlet named auth.
+ * This service responsibility is to set a bridge between Auth::LoginDialogComponent and Core::HttpConfigInterceptor.
+ * When an user gets 401 error response from server, interceptor will redirect to LoginDialog as outlet named auth.
  * While redirecting,it will dispatch a new RetryRequest object into failedRequests subject. This dispatching will
- * be caught by LoginPopup, and after successful authorization, it will dispatch the requests into retryFailedRequests,
+ * be caught by LoginDialog, and after successful authorization, it will dispatch the requests into retryFailedRequests,
  * which is listened by interceptor. Interceptor will handle the dispatched requests.
  *
  * The issue is that, there can be some non breaking recursion problem. If server starts to give 401 responses

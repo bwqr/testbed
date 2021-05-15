@@ -1,1 +1,34 @@
-<p>login-dialog works!</p>
+<div class="modal-backdrop fade show"></div>
+<div class="modal fade show d-block">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Login to continue</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form [formGroup]="formGroup" (ngSubmit)="login(formGroup.value)">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="email">Email</label>
+            <input id="email" class="form-control" type="email" formControlName="email" placeholder="Email"
+                   appFormValidity>
+          </div>
+          <div class="mb-3">
+            <label for="password">Password</label>
+            <input id="password" class="form-control" type="password" formControlName="password" placeholder="Password"
+                   appFormValidity>
+          </div>
+
+          <div class="mb-3" *ngIf="errorMessage">
+            <app-error-message [errorMessage]="errorMessage"></app-error-message>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="w-100 btn btn-primary" type="submit" [disabled]="!formGroup.valid || isInProcessingState">
+            Login
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

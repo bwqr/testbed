@@ -2,7 +2,7 @@ import {Component, OnDestroy, OnInit} from '@angular/core';
 import {MainComponent} from '../../../shared/components/main/main.component';
 import {ExperimentViewModelService} from '../../../experiment/services/experiment-view-model.service';
 import {ActivatedRoute} from '@angular/router';
-import {switchMap} from 'rxjs/operators';
+import {catchError, switchMap} from 'rxjs/operators';
 import {SlimRunner} from '../../../experiment/models';
 import {AdminViewModelService} from '../../services/admin-view-model.service';
 import {interval, Subscription} from 'rxjs';
@@ -41,7 +41,7 @@ export class RunnerComponent extends MainComponent implements OnInit, OnDestroy 
   ngOnInit(): void {
     this.subs.add(
       this.activatedRoute.params.pipe(
-        switchMap((params) => this.experimentViewModel.runner(params.id))
+        switchMap((params) => this.experimentViewModel.runner(params.id)),
       )
         .subscribe(runner => {
           this.runner = runner;
@@ -51,7 +51,8 @@ export class RunnerComponent extends MainComponent implements OnInit, OnDestroy 
           }
 
           this.receiverValuesSub = interval(2000).pipe(
-            switchMap(_ => this.viewModel.runnerReceiversValues(runner.id))
+            switchMap(_ => this.viewModel.runnerReceiversValues(runner.id)),
+            catchError((_, caught) => caught)
           )
             .subscribe(res => {
               if (!res.values) {
