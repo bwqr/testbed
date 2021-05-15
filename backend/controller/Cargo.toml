@@ -1,5 +1,5 @@
 [package]
-name = "testbed"
+name = "controller"
 version = "0.1.0"
 authors = ["bwqr <ruzgardeniz.08@hotmail.com>"]
 edition = "2018"

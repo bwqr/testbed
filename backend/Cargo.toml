@@ -4,7 +4,7 @@ members = [
     "auth",
     "core",
     "experiment",
-    "testbed",
+    "controller",
     "service",
     "shared",
     "user"

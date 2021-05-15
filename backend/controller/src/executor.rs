@@ -60,7 +60,7 @@ impl Executor {
     }
 
     fn gen_tmp_dir(job_id: ModelId) -> String {
-        format!("/tmp/testbed/{}", job_id)
+        format!("/tmp/controller/{}", job_id)
     }
 
     fn create_dir_and_files(script_dir: &str, code: String) -> Result<(), Error> {
