@@ -79,6 +79,15 @@ pub async fn sign_up(
     let insert_model = request.as_insert_model(&hash);
 
     let user = web::block(move || -> Result<User, Box<dyn ErrorMessaging>> {
+        // check if user already exists, leaving this check to database constraints causes gaps between ids since id is a serial
+        let user_count = users::table.filter(users::email.eq(insert_model.email.as_str()))
+            .select(diesel::dsl::CountStar)
+            .first::<i64>(&conn)?;
+
+        if user_count != 0 {
+            return Err(Box::new(ErrorMessage::UserExists));
+        }
+
         let result = diesel::insert_into(users::table)
             .values(&insert_model)
             .get_result::<User>(&conn);
@@ -87,6 +96,7 @@ pub async fn sign_up(
             Ok(user) => Ok(user),
             Err(err) => match err {
                 Error::DatabaseError(kind, _) => match kind {
+                    // Some concurrent operations can cause inserting same user twice, like sending a same sign up request simultaneously, previous user_count check can not avoid this error
                     DatabaseErrorKind::UniqueViolation => Err(Box::new(ErrorMessage::UserExists)),
                     _ => Err(Box::new(err))
                 },

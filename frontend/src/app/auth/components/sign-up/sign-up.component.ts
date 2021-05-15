@@ -48,7 +48,7 @@ export class SignUpComponent extends MainComponent implements OnInit {
           return Promise.reject(error);
         }),
         finalize(() => this.leaveProcessingState())
-      ).subscribe(_ => this.router.navigate(['/login']))
+      ).subscribe(_ => this.router.navigate(['/auth/login']))
     );
   }
 }
