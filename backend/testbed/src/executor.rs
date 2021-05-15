@@ -103,6 +103,10 @@ impl Executor {
                 Ok(Some(status)) => {
                     exited = true;
 
+                    if let Some(137) = status.code() {
+                        return Err(Error::Custom(String::from("child is killed, probably due to out of memory")));
+                    }
+
                     // if not successful, gather the outputs
                     if !status.success() {
                         let mut output = String::new();
@@ -320,6 +324,11 @@ impl Executor {
                 if status.success() {
                     return Err(Error::Custom(String::from("User receiver code exited successfully without waiting end of experiment, this should not be the case")));
                 }
+
+                if let Some(137) = status.code() {
+                    return Err(Error::Custom(String::from("child is killed, probably due to out of memory")));
+                }
+
                 info!("child crashed");
 
                 // if not successful, gather the outputs
