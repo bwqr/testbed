@@ -1,22 +1,18 @@
-use actix_web::{error::BlockingError, FromRequest, HttpRequest, HttpResponse, web};
+use actix_web::{FromRequest, HttpRequest, HttpResponse};
 use actix_web::dev::Payload;
 use diesel::{Identifiable, Insertable, Queryable};
 use diesel::pg::Pg;
-use diesel::prelude::*;
-use diesel::result::Error;
 use diesel::sql_types::VarChar;
-use futures::future::LocalBoxFuture;
-use futures::FutureExt;
+use futures::future::{err, ok, Ready};
 use serde::{Deserialize, Serialize};
 
 use core::db::DieselEnum;
 use core::error::ErrorMessaging;
 use core::ErrorMessage;
-use core::models::token::AuthToken;
 use core::schema::users;
-use core::types::{DBPool, ModelId};
+use core::types::ModelId;
 
-#[derive(Queryable, Identifiable, Serialize)]
+#[derive(Queryable, Identifiable, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     pub id: ModelId,
@@ -37,35 +33,15 @@ impl User {
 
 impl FromRequest for User {
     type Error = HttpResponse;
-    type Future = LocalBoxFuture<'static, Result<Self, Self::Error>>;
+    type Future = Ready<Result<Self, Self::Error>>;
     type Config = ();
 
     fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
-        let conn = req.app_data::<web::Data<DBPool>>()
-            .ok_or_else(|| ErrorMessage::DBError.error())
-            .map(|c| c.get().unwrap());
-
-        let user_id = req.head().extensions().get::<AuthToken>()
-            .ok_or_else(|| ErrorMessage::UserNotFound.error())
-            .map(|a| a.user_id);
-
-
-        async move {
-            let user_id = user_id?;
-            let conn = conn?;
-
-            web::block(move || users::table.find(user_id).first::<User>(&conn))
-                .await
-                .map_err(|e| match e {
-                    BlockingError::Error(e) => {
-                        match e {
-                            Error::NotFound => ErrorMessage::UserNotFound.error(),
-                            _ => e.error()
-                        }
-                    }
-                    BlockingError::Canceled => ErrorMessage::BlockingCanceled.error()
-                })
-        }.boxed_local()
+        if let Some(user) = req.head().extensions().get::<User>() {
+            ok((*user).clone())
+        } else {
+            err(ErrorMessage::UserNotFound.error())
+        }
     }
 }
 
@@ -96,7 +72,7 @@ pub const SLIM_USER_COLUMNS: (users::id, users::first_name, users::last_name, us
     users::role_id,
 );
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub enum UserStatus {
     NotVerified,
     Verified,
