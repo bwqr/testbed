@@ -53,7 +53,7 @@ pub async fn login(pool: web::Data<DBPool>, hash: web::Data<Hash>, request: Sani
     })
         .await?;
 
-    let token = hash.encode(&AuthToken::new(user.id, user.role_id, TIMEOUT))?;
+    let token = hash.encode(&AuthToken::new(user.id, TIMEOUT))?;
 
     Ok(Json(TokenResponse { token }))
 }

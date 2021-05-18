@@ -21,10 +21,6 @@ htmlescape = "0.3"
 
 jsonwebtoken = "7"
 
-lazy_static = "1.4"
-
-regex = "1.4"
-
 ring = "0.16"
 
 serde = { version = "1", features = ["derive"] }

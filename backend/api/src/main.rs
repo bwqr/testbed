@@ -10,12 +10,12 @@ use actix_web::{App, http::header, HttpServer, middleware, web};
 use diesel::{PgConnection, r2d2};
 
 use core::Config;
-use core::middlewares::auth::Auth;
 use core::types::DBPool;
 use core::utils::Algorithm;
 use core::utils::Hash;
 use experiment::ExperimentServer;
 use service::{ClientServices, mail::{MailClient, MailClientMock, MailService, SendMailMessage}, NotificationServer, Servers, SessionManager};
+use user::middlewares::auth::Auth;
 
 mod handlers;
 

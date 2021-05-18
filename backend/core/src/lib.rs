@@ -1,7 +1,5 @@
 #[macro_use]
 extern crate diesel;
-#[macro_use]
-extern crate lazy_static;
 
 use std::fmt::Debug;
 
@@ -13,7 +11,6 @@ use crate::error::{ErrorMessaging, HttpError};
 
 pub mod db;
 pub mod error;
-pub mod middlewares;
 pub mod models;
 pub mod responses;
 pub mod sanitized;

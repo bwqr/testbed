@@ -700,8 +700,6 @@ dependencies = [
  "futures",
  "htmlescape",
  "jsonwebtoken",
- "lazy_static",
- "regex",
  "ring",
  "serde",
  "serde_json",
@@ -2447,6 +2445,8 @@ dependencies = [
  "derive",
  "diesel",
  "futures",
+ "lazy_static",
+ "regex",
  "serde",
 ]
 

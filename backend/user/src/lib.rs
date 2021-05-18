@@ -1,11 +1,14 @@
 #[macro_use]
 extern crate diesel;
+#[macro_use]
+extern crate lazy_static;
 
 use actix_web::web;
 
-use core::middlewares::auth::Auth;
+use crate::middlewares::auth::Auth;
 
 mod handlers;
+pub mod middlewares;
 pub mod models;
 mod requests;
 

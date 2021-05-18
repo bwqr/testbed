@@ -11,19 +11,16 @@ pub struct AuthToken {
     pub exp: i64,
     // user id
     pub user_id: ModelId,
-    // role id
-    pub role_id: ModelId,
 }
 
 impl AuthToken {
-    pub fn new(user_id: ModelId, role_id: ModelId, timeout: i64) -> Self {
+    pub fn new(user_id: ModelId, timeout: i64) -> Self {
         let now = Utc::now().timestamp();
 
         AuthToken {
             iat: now,
             exp: now + timeout,
             user_id,
-            role_id,
         }
     }
 }

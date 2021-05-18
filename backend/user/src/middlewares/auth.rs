@@ -1,20 +1,31 @@
-use actix_web::{Error, HttpMessage, web};
+use std::cell::RefCell;
+use std::future::Future;
+use std::pin::Pin;
+use std::rc::Rc;
+
+use actix_web::{Error, error::BlockingError, HttpMessage, web};
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
-use futures::future::{Either, ok, Ready};
+use diesel::prelude::*;
+use diesel::result::Error as DieselError;
+use futures::future::{ok, Ready};
 use futures::task::{Context, Poll};
 use regex::Regex;
 
-use crate::ErrorMessage;
-use crate::models::token::AuthToken;
-use crate::utils::{Hash, JWTErrorKind};
-use crate::error::ErrorMessaging;
+use core::error::ErrorMessaging;
+use core::ErrorMessage;
+use core::models::token::AuthToken;
+use core::schema::users;
+use core::types::DBPool;
+use core::utils::{Hash, JWTErrorKind};
+
+use crate::models::user::User;
 
 pub struct Auth;
 
 
 impl<S, B> Transform<S> for Auth
     where
-        S: Service<Request=ServiceRequest, Response=ServiceResponse<B>, Error=Error>,
+        S: Service<Request=ServiceRequest, Response=ServiceResponse<B>, Error=Error> + 'static,
         S::Future: 'static,
         B: 'static
 {
@@ -26,41 +37,57 @@ impl<S, B> Transform<S> for Auth
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(AuthMiddleware { service })
+        ok(AuthMiddleware { service: Rc::new(RefCell::new(service)) })
     }
 }
 
 
 pub struct AuthMiddleware<S> {
-    service: S
+    service: Rc<RefCell<S>>,
 }
 
 impl<S, B> Service for AuthMiddleware<S>
     where
-        S: Service<Request=ServiceRequest, Response=ServiceResponse<B>, Error=Error>,
+        S: Service<Request=ServiceRequest, Response=ServiceResponse<B>, Error=Error> + 'static,
         S::Future: 'static,
+        B: 'static
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type Future = Either<S::Future, Ready<Result<Self::Response, Self::Error>>>;
+    type Future = Pin<Box<dyn Future<Output=Result<Self::Response, Self::Error>>>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        match parse_user(&req) {
-            Ok(auth_token) => {
-                req.extensions_mut().insert(auth_token);
-                Either::Left(self.service.call(req))
+        let mut service = self.service.clone();
+        Box::pin(async move {
+            match parse_token(&req) {
+                Ok(auth_token) => {
+                    let conn = req.app_data::<web::Data<DBPool>>()
+                        .ok_or::<Self::Error>(ErrorMessage::MiddlewareFailed.error().into())?
+                        .get()
+                        .unwrap();
+
+                    match web::block(move || users::table.find(auth_token.user_id).first::<User>(&conn))
+                        .await {
+                        Ok(user) => {
+                            req.extensions_mut().insert(user);
+                            service.call(req).await
+                        }
+                        Err(BlockingError::Error(DieselError::NotFound)) => Err(ErrorMessage::UserNotFound.error().into()),
+                        Err(_) => Err(ErrorMessage::MiddlewareFailed.error().into()),
+                    }
+                }
+                Err(e) => Err(e.error().into())
             }
-            Err(e) => Either::Right(ok(req.into_response(e.error().into_body())))
-        }
+        })
     }
 }
 
-fn parse_user(req: &ServiceRequest) -> Result<AuthToken, ErrorMessage> {
+fn parse_token(req: &ServiceRequest) -> Result<AuthToken, ErrorMessage> {
     lazy_static! {
                     static ref HEADER_RE: Regex = Regex::new(r"^Bearer ([A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$)").unwrap();
                     static ref QUERY_RE: Regex = Regex::new(r"token=([A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$)").unwrap();

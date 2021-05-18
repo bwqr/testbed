@@ -16,4 +16,8 @@ diesel = { version = "1.4", features = ["postgres", "r2d2", "chrono"] }
 
 futures = "0.3"
 
+lazy_static = "1.4"
+
+regex = "1.4"
+
 serde = "1"

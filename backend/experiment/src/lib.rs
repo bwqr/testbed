@@ -3,8 +3,8 @@ use actix_web::web;
 
 pub use connection::server::ExperimentServer;
 use core::error::{ErrorMessaging, HttpError};
-use core::middlewares::auth::Auth;
-use core::middlewares::role::AdminUser;
+use user::middlewares::auth::Auth;
+use user::middlewares::role::AdminUser;
 
 mod handlers;
 mod connection;
