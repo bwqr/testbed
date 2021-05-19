@@ -66,10 +66,11 @@ impl<S, B> Service for AuthMiddleware<S>
         Box::pin(async move {
             match parse_token(&req) {
                 Ok(auth_token) => {
-                    let conn = req.app_data::<web::Data<DBPool>>()
-                        .ok_or::<Self::Error>(ErrorMessage::MiddlewareFailed.error().into())?
-                        .get()
-                        .unwrap();
+                    let conn = if let Some(pool) = req.app_data::<web::Data<DBPool>>() {
+                        pool.get().unwrap()
+                    } else {
+                        return Ok(req.into_response(ErrorMessage::MiddlewareFailed.error().into_body()));
+                    };
 
                     match web::block(move || users::table.find(auth_token.user_id).first::<User>(&conn))
                         .await {
@@ -77,11 +78,11 @@ impl<S, B> Service for AuthMiddleware<S>
                             req.extensions_mut().insert(user);
                             service.call(req).await
                         }
-                        Err(BlockingError::Error(DieselError::NotFound)) => Err(ErrorMessage::UserNotFound.error().into()),
-                        Err(_) => Err(ErrorMessage::MiddlewareFailed.error().into()),
+                        Err(BlockingError::Error(DieselError::NotFound)) => Ok(req.into_response(ErrorMessage::UserNotFound.error().into_body())),
+                        Err(_) => Ok(req.into_response(ErrorMessage::MiddlewareFailed.error().into_body())),
                     }
                 }
-                Err(e) => Err(e.error().into())
+                Err(e) => Ok(req.into_response(e.error().into_body()))
             }
         })
     }
