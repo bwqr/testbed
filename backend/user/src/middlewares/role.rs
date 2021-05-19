@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::Error;
-use futures::future::{Either, err, ok, Ready};
+use futures::future::{Either, ok, Ready};
 
 use core::error::ErrorMessaging;
 use core::ErrorMessage;
@@ -53,16 +53,23 @@ impl<S, B> Service for RoleMiddleware<S>
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        let role_id = if let Some(user) = req.head().extensions().get::<User>() {
-            user.role_id
-        } else {
-            return Either::Right(err(ErrorMessage::UserNotFound.error().into()));
-        };
+        let res = check_role(req.head().extensions().get::<User>(), self.role_id);
 
-        if role_id == self.role_id {
-            Either::Left(self.service.call(req))
-        } else {
-            Either::Right(err(ErrorMessage::Forbidden.error().into()))
+        match res {
+            Ok(()) => Either::Left(self.service.call(req)),
+            Err(e) => Either::Right(ok(req.into_response(e.error().into_body())))
         }
+    }
+}
+
+fn check_role(user: Option<&User>, role_id: ModelId) -> Result<(), ErrorMessage> {
+    if let Some(user) = user {
+        if user.role_id == role_id {
+            Ok(())
+        } else {
+            Err(ErrorMessage::Forbidden)
+        }
+    } else {
+        Err(ErrorMessage::UserNotFound)
     }
 }
