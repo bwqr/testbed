@@ -1,12 +1,20 @@
 import socket
 import threading
-from random import random
+import time
 from typing import Tuple, List
 
 from serial import Serial
 
-start_message = 'arduino_available'
-end_of_experiment = 'end_of_experiment'
+
+class Outgoing:
+    pass
+
+
+class Incoming:
+    class Tcp:
+        end_of_experiment = 'end_of_experiment'
+
+
 is_experiment_ended = False
 
 
@@ -26,40 +34,52 @@ class Connection(threading.Thread):
                 try:
                     conn, addr = sock.accept()
                     with conn:
-                        conn.recv(len(end_of_experiment))
+                        conn.recv(len(Incoming.Tcp.end_of_experiment))
                         is_experiment_ended = True
                 # socket errors are ignored, like timeout
-                except socket.error:
+                except socket.timeout:
                     pass
 
 
 class Receiver:
-    def __init__(self, device_paths: List[str]):
-        self.connection = Connection(name='connection-thread')
-        self.connection.start()
-        self.devs = list(map(lambda path: Serial(path, 9600), device_paths))
+    def __init__(self, device_paths: List[str], sample_frequency):
+        if sample_frequency <= 0:
+            raise ValueError('sample rate cannot be less than or equal to zero')
+        self.__sample_frequency = sample_frequency
+
+        self.__devs = list(map(lambda path: Serial(path, 9600), device_paths))
+
+        self.__connection = Connection(name='connection-thread')
+        self.__connection.start()
 
     def next(self) -> Tuple[bool, List[int]]:
         read_data = []
-        for dev in self.devs:
+        start_time = time.monotonic_ns()
+
+        for dev in self.__devs:
             read_data.append(int(dev.read()))
+
+        # in seconds
+        elapsed_time = (time.monotonic_ns() - start_time) / 1_000_000_000
+        sample_time = 1 / self.__sample_frequency
+        # in seconds
+        sleep_time = sample_time - elapsed_time
+
+        if sleep_time > 0:
+            time.sleep(sleep_time)
+        else:
+            # receiver could not keep up with sampling rate
+            pass
 
         return is_experiment_ended, read_data
 
 
 def run():
-    receiver = Receiver(['/dev/ttyUSB0', '/dev/ttyUSB1'])
+    receiver = Receiver(['/dev/ttyUSB0'], 0.2)
 
-    i = 0
     ended, data = receiver.next()
-    while ended is not None and i < 5000:
-        if ended:
-            i += 1
-
-        for d in data:
-            for _ in range(0, int(random() * 10)):
-                d = d * 5
-            print(d)
+    while not ended:
+        print(data)
 
         ended, data = receiver.next()
 
