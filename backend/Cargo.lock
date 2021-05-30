@@ -668,6 +668,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "serial",
  "shared",
 ]

@@ -9,11 +9,12 @@ use core::db::DieselEnum;
 use core::error::ErrorMessaging;
 use core::ErrorMessage as CoreErrorMessage;
 use core::models::paginate::{CountStarOver, Paginate, Pagination, PaginationRequest};
-use core::responses::{SuccessResponse, TokenResponse};
+use core::responses::SuccessResponse;
 use core::sanitized::SanitizedJson;
 use core::schema::{experiments, jobs, runners};
 use core::types::{DBPool, DefaultResponse, ModelId, Result};
 use core::utils::Hash;
+use shared::JoinServerRequest;
 use user::models::user::User;
 
 use crate::connection::ReceiverValues;
@@ -32,11 +33,13 @@ pub async fn join_server(
     experiment_server: web::Data<Addr<ExperimentServer>>,
     req: HttpRequest,
     stream: web::Payload,
-    token: web::Query<TokenResponse>,
+    join_server_request: web::Query<JoinServerRequest>,
 ) -> DefaultResponse {
     let conn = pool.get().unwrap();
 
-    let token = hash.decode::<RunnerToken>(token.token.as_str())
+    let join_server_request = join_server_request.into_inner();
+
+    let token = hash.decode::<RunnerToken>(join_server_request.token.as_str())
         .map_err(|_| CoreErrorMessage::InvalidToken)?;
 
     let runner = web::block(move || runners::table
@@ -45,7 +48,7 @@ pub async fn join_server(
     )
         .await?;
 
-    ws::start(Session::new(experiment_server.get_ref().clone(), runner.id), &req, stream)
+    ws::start(Session::new(experiment_server.get_ref().clone(), runner.id, join_server_request.runner_state), &req, stream)
         .map_err(|_| Box::new(CoreErrorMessage::WebSocketConnectionError) as Box<dyn ErrorMessaging>)
 }
 
@@ -229,7 +232,9 @@ pub async fn run_experiment(
         .await?;
 
     let job_id = job.id;
+
     if let Err(e) = experiment_server.send(RunExperiment {
+        code: job.code.clone(),
         job_id,
         runner_id,
         user_id,

@@ -1,6 +1,7 @@
 use actix::{Addr, Message};
 
 use core::types::ModelId;
+use shared::RunnerState;
 
 use crate::connection::session::Session;
 
@@ -14,6 +15,7 @@ pub struct RunMessage {
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct JoinServerMessage {
+    pub state: RunnerState,
     pub runner_id: ModelId,
     pub addr: Addr<Session>,
 }

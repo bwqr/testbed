@@ -11,10 +11,11 @@ use awc::ws::{Codec, Frame, Message};
 use futures::stream::{SplitSink, StreamExt};
 use log::{error, info};
 
+use shared::{JoinServerRequest, RunnerState};
 use shared::SocketErrorKind;
 use shared::websocket_messages::{client, server};
 
-use crate::messages::{RunnerReceiversValueMessage, RunMessage, RunResultMessage, UpdateExecutorMessage};
+use crate::messages::{RunMessage, RunnerReceiversValueMessage, RunResultMessage, UpdateExecutorMessage};
 
 type Write = SinkWrite<Message, SplitSink<Framed<BoxedSocket, Codec>, Message>>;
 
@@ -33,6 +34,7 @@ pub struct Connection {
     current_timing_index: usize,
     executor: Option<Recipient<RunMessage>>,
     pending_messages: Vec<Message>,
+    runner_state: RunnerState,
 }
 
 impl Connection {
@@ -44,6 +46,7 @@ impl Connection {
             current_timing_index: 0,
             executor: None,
             pending_messages: Vec::new(),
+            runner_state: RunnerState::Idle,
         }
     }
 
@@ -92,16 +95,21 @@ impl Connection {
         Ok(())
     }
 
-    async fn connect(server_url: String, access_token: String) -> Result<Framed<BoxedSocket, Codec>, WsClientError> {
+    async fn connect(server_url: String, access_token: String, runner_state: RunnerState) -> Result<Framed<BoxedSocket, Codec>, WsClientError> {
+        let queries = serde_urlencoded::to_string(JoinServerRequest {
+            token: access_token,
+            runner_state,
+        }).unwrap();
+
         Client::new()
-            .ws(format!("{}?token={}", server_url, access_token))
+            .ws(format!("{}?{}", server_url, queries))
             .connect()
             .await
             .map(|f| f.1)
     }
 
     fn try_connect(act: &mut Connection, ctx: &mut <Self as Actor>::Context) {
-        Self::connect(act.server_url.clone(), act.access_token.clone())
+        Self::connect(act.server_url.clone(), act.access_token.clone(), act.runner_state.clone())
             .into_actor(act)
             .then(move |framed, act, ctx| {
                 match framed {
@@ -210,6 +218,8 @@ impl Handler<RunResultMessage> for Connection {
     type Result = ();
 
     fn handle(&mut self, msg: RunResultMessage, _: &mut Self::Context) {
+        self.runner_state = RunnerState::Idle;
+
         let message = Message::Text(serde_json::to_string(&server::SocketMessage {
             kind: server::SocketMessageKind::RunResult,
             data: server::RunResult {

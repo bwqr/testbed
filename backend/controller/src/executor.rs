@@ -16,6 +16,7 @@ use crate::state::{Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, St
 const PYTHON_VERSION: &str = "3.9";
 const ALPINE_VERSION: &str = "3.13";
 
+// in seconds
 const SEND_RECEIVERS_VALUES_INTERVAL: u64 = 10;
 
 mod limits {
@@ -30,12 +31,16 @@ mod limits {
 }
 
 mod incoming {
-    pub const SETUP_MESSAGE: &str = "arduino_available";
-    pub const END_MESSAGE: &str = "end_of_experiment";
+    pub mod arduino {
+        pub const SETUP_MESSAGE: &str = "arduino_available";
+        pub const END_MESSAGE: &str = "end_of_experiment";
+    }
 }
 
 mod outgoing {
-    pub const END_MESSAGE: &str = "end_of_experiment";
+    pub mod tcp {
+        pub const END_MESSAGE: &str = "end_of_experiment";
+    }
 }
 
 pub struct Executor {
@@ -166,7 +171,7 @@ impl Executor {
         port.set_timeout(Duration::from_secs(1))
             .map_err(|e| Error::Serial(e))?;
 
-        let mut buffer = [0 as u8; incoming::SETUP_MESSAGE.len()];
+        let mut buffer = [0 as u8; incoming::arduino::SETUP_MESSAGE.len()];
 
         let mut error: Option<Error> = None;
 
@@ -190,7 +195,7 @@ impl Executor {
     }
 
     fn run_commands(&self, state: State, port: &mut serial::SystemPort, child: &mut std::process::Child) -> Result<ExitReason, Error> {
-        let mut buff = [0 as u8; incoming::END_MESSAGE.len()];
+        let mut buff = [0 as u8; incoming::arduino::END_MESSAGE.len()];
 
         // clear previous characters from transmitter
         port.write("\n".as_bytes())
@@ -230,7 +235,7 @@ impl Executor {
             }
         }
 
-        port.write("end_delimiter\n".as_bytes())
+        port.write(END_DELIMITER_NEW_LINE.as_bytes())
             .map_err(|e| Error::IO(e))?;
 
         Ok(ExitReason::EndOfExperiment)
@@ -278,7 +283,7 @@ impl Executor {
                         let _ = child.kill();
                         Error::Custom(String::from("Failed to connect receiver code over tcp"))
                     })?
-                    .write(outgoing::END_MESSAGE.as_bytes())
+                    .write(outgoing::tcp::END_MESSAGE.as_bytes())
                     .map_err(|_| {
                         let _ = child.kill();
                         Error::Custom(String::from("Failed to send END_MESSAGE to receiver code"))

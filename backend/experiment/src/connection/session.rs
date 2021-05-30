@@ -3,6 +3,7 @@ use actix_web_actors::ws::{Message, ProtocolError, WebsocketContext};
 use log::{error, info};
 
 use core::types::ModelId;
+use shared::RunnerState;
 use shared::SocketErrorKind;
 use shared::websocket_messages::{client, server};
 
@@ -11,13 +12,16 @@ use crate::connection::server::ExperimentServer;
 
 pub struct Session {
     experiment_server: Addr<ExperimentServer>,
+    // this is used for joining into Experiment Server, after that point, it does not reflect runner state
+    initial_runner_state: RunnerState,
     runner_id: ModelId,
 }
 
 impl Session {
-    pub fn new(experiment_server: Addr<ExperimentServer>, runner_id: ModelId) -> Self {
+    pub fn new(experiment_server: Addr<ExperimentServer>, runner_id: ModelId, initial_runner_state: RunnerState) -> Self {
         Session {
             experiment_server,
+            initial_runner_state,
             runner_id,
         }
     }
@@ -95,6 +99,7 @@ impl Actor for Session {
         let exp_addr = self.experiment_server.clone();
 
         let msg = JoinServerMessage {
+            state: self.initial_runner_state.clone(),
             runner_id: self.runner_id,
             addr: ctx.address(),
         };
@@ -135,7 +140,6 @@ impl Handler<RunMessage> for Session {
     fn handle(&mut self, msg: RunMessage, ctx: &mut Self::Context) {
         info!("got run message {}", msg.job_id);
 
-        // TODO we can send directly message to client, instead of copying msg into RunExperiment
         ctx.text(serde_json::to_string(&client::SocketMessage {
             kind: client::SocketMessageKind::RunExperiment,
             data: client::RunExperiment { job_id: msg.job_id, code: msg.code },
