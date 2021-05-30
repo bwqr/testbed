@@ -145,6 +145,7 @@ async fn main() -> std::io::Result<()> {
             .configure(user::register)
             .configure(auth::register)
             .configure(experiment::register)
+            .configure(slot::register)
             .service(
                 web::scope("api")
                     .wrap(Auth)

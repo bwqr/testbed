@@ -1,0 +1,17 @@
+use chrono::NaiveDateTime;
+use diesel::{Identifiable, Queryable};
+use serde::Serialize;
+
+use core::schema::slots;
+use core::types::ModelId;
+
+#[derive(Identifiable, Queryable, Serialize)]
+pub struct Slot {
+    pub id: ModelId,
+    pub user_id: ModelId,
+    pub runner_id: ModelId,
+    pub start_at: NaiveDateTime,
+    pub end_at: NaiveDateTime,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}

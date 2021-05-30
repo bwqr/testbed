@@ -6,6 +6,7 @@ members = [
     "experiment",
     "controller",
     "service",
+    "slot",
     "shared",
     "user"
 ]

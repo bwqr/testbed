@@ -83,7 +83,8 @@ execute procedure update_timestamp();
 insert into runners (name, access_key)
 values ('NanoNetworking Testbed', 'runner_1');
 
-INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'transmitter crash', 'import sys
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at)
+VALUES (1, 'transmitter crash', 'import sys
 from random import random
 from receiver import Receiver
 from transmitter import State, WordEncoder, Spray
@@ -99,7 +100,8 @@ if __name__ == ''__main__'':
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-04-25 11:58:41.265656', '2021-04-25 11:58:41.265656');
-INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'transmitter ddos', 'import sys
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at)
+VALUES (1, 'transmitter ddos', 'import sys
 from random import random
 from receiver import Receiver
 from transmitter import State, WordEncoder, Spray
@@ -117,7 +119,8 @@ if __name__ == ''__main__'':
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-04-18 16:09:36.646962', '2021-04-18 16:09:36.646962');
-INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'output xss hacking', 'import sys
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at)
+VALUES (1, 'output xss hacking', 'import sys
 from random import random
 from receiver import Receiver
 from transmitter import State, WordEncoder, Spray
@@ -141,7 +144,8 @@ if __name__ == ''__main__'':
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-04-18 16:04:44.018911', '2021-04-18 16:04:44.018911');
-INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'receiver crash', 'import sys
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at)
+VALUES (1, 'receiver crash', 'import sys
 from random import random
 from receiver import Receiver
 from transmitter import State, WordEncoder, Spray
@@ -161,7 +165,8 @@ if __name__ == ''__main__'':
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-04-25 11:58:01.943044', '2021-04-25 11:58:01.943044');
-INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'receiver exit without waiting experiment end', 'import sys
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at)
+VALUES (1, 'receiver exit without waiting experiment end', 'import sys
 from random import random
 from receiver import Receiver
 from transmitter import State, WordEncoder, Spray
@@ -187,7 +192,8 @@ if __name__ == ''__main__'':
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-04-25 11:54:01.737986', '2021-04-25 11:54:01.737986');
-INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'normal', 'import sys
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at)
+VALUES (1, 'normal', 'import sys
 from random import random
 from receiver import Receiver
 from transmitter import State, WordEncoder, Spray
@@ -216,7 +222,8 @@ if __name__ == &#x27;__main__&#x27;:
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-03-24 13:16:35.128303', '2021-03-24 13:16:35.128303');
-INSERT INTO public.experiments (user_id, name, code, created_at, updated_at) VALUES (1, 'receiver ddos', 'import sys
+INSERT INTO public.experiments (user_id, name, code, created_at, updated_at)
+VALUES (1, 'receiver ddos', 'import sys
 from random import random
 from receiver import Receiver
 from transmitter import State, WordEncoder, Spray
@@ -238,3 +245,22 @@ if __name__ == ''__main__'':
         run_receiver(sys.argv[2:])
     else:
         run_transmitter()', '2021-04-25 11:52:50.821539', '2021-04-25 11:52:50.821539');
+
+create table slots
+(
+    id         serial PRIMARY KEY NOT NULL,
+    user_id    integer            NOT NULL,
+    runner_id  integer            NOT NULL,
+    start_at   timestamp          NOT NULL,
+    end_at     timestamp          NOT NULL,
+    created_at timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT slot_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    CONSTRAINT slot_runner_id FOREIGN KEY (runner_id) REFERENCES runners (id) ON DELETE NO ACTION ON UPDATE NO ACTION
+);
+
+create trigger slots_updated_at
+    before update
+    on slots
+    for each row
+execute procedure update_timestamp();

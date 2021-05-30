@@ -39,6 +39,18 @@ table! {
 }
 
 table! {
+    slots (id) {
+        id -> Int4,
+        user_id -> Int4,
+        runner_id -> Int4,
+        start_at -> Timestamp,
+        end_at -> Timestamp,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+table! {
     users (id) {
         id -> Int4,
         first_name -> Varchar,
@@ -53,6 +65,8 @@ table! {
 joinable!(experiments -> users (user_id));
 joinable!(jobs -> experiments (experiment_id));
 joinable!(jobs -> runners (runner_id));
+joinable!(slots -> runners (runner_id));
+joinable!(slots -> users (user_id));
 joinable!(users -> roles (role_id));
 
 allow_tables_to_appear_in_same_query!(
@@ -60,5 +74,6 @@ allow_tables_to_appear_in_same_query!(
     jobs,
     roles,
     runners,
+    slots,
     users,
 );

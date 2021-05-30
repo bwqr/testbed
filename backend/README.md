@@ -99,3 +99,7 @@ cargo run -p controller
 ```
 
 Hopefully, you can start sending requests to backend.
+
+## RESTful API Documentation
+
+You can find a Postman collection under ```resources``` directory in this repository.
