@@ -6,6 +6,7 @@ use core::schema::slots;
 use core::types::ModelId;
 
 #[derive(Identifiable, Queryable, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Slot {
     pub id: ModelId,
     pub user_id: ModelId,

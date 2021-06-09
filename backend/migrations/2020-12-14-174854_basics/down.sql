@@ -1,4 +1,7 @@
 -- This file should undo anything in `up.sql`
+drop trigger slots_updated_at on slots;
+drop table slots;
+
 drop trigger jobs_updated_at on jobs;
 drop table jobs;
 

@@ -3,6 +3,7 @@ import {environment} from '../environments/environment';
 const experiment = environment.apiEndpoint + '/experiment';
 const user = environment.apiEndpoint + '/user';
 const auth = environment.apiEndpoint + '/auth';
+const slot = environment.apiEndpoint + '/slot';
 
 export const routes = {
   user: {
@@ -22,5 +23,12 @@ export const routes = {
     verifyAccount: auth + '/verify-account',
     resetPassword: auth + '/reset-password',
     forgotPassword: auth + '/forgot-password'
+  },
+  slot: {
+    slots: {
+      root: slot + '/slots',
+      reserved: slot + '/slots/reserved'
+    },
+    slot: slot + '/slot'
   }
 };

@@ -1,0 +1,19 @@
+<div class="container mt-4" *ngIf="isPageReady">
+  <div class="mb-4">
+    <p class="fs-3">Reserve a Slot</p>
+    <hr>
+  </div>
+  <div>
+    <button (click)="previousDay()">previous</button>
+    {{filterDate | date: formats.shortDate}}
+    <button (click)="nextDay()">next</button>
+  </div>
+  <div class="row">
+    <div class="col-1 p-2" *ngFor="let res of reserved">
+      <div [ngStyle]="{'background': res.reserved ? 'red' : 'green'}" style="height: 100px">
+        <button (click)="reserveSlot(res)" [disabled]="res.reserved || isInProcessingState">Reserve</button>
+        {{res.date | date: formats.shortDate}}
+      </div>
+    </div>
+  </div>
+</div>
