@@ -5,6 +5,7 @@ import {ActivatedRoute} from '@angular/router';
 import {finalize, switchMap} from 'rxjs/operators';
 import {formats} from '../../../../defs';
 import {BehaviorSubject, combineLatest} from 'rxjs';
+import {MainService} from '../../../core/services/main.service';
 
 @Component({
   selector: 'app-slot-reserve',
@@ -19,7 +20,7 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
   runnerId: number;
 
   filterDate: Date;
-  isFilterToday: boolean;
+  isFilterDateToday: boolean;
 
   trigger = new BehaviorSubject(null);
 
@@ -29,28 +30,30 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
 
   constructor(
     private viewModel: SlotViewModelService,
-    private activatedRoute: ActivatedRoute
+    private activatedRoute: ActivatedRoute,
   ) {
     super();
-    this.filterDate = new Date();
-    // set filterDate to start of the today
-    this.filterDate.setSeconds(0);
-    this.filterDate.setMinutes(0);
-    this.filterDate.setHours(0);
-    this.isFilterToday = true;
+    this.filterDate = this.startOfDay((new Date()).getTime());
+    this.isFilterDateToday = true;
   }
 
   ngOnInit(): void {
     this.subs.add(
       combineLatest([this.activatedRoute.params, this.trigger]).pipe(
         switchMap(([params, _]) => {
-          this.runnerId = parseInt(params.runnerId, 0);
-          const today = new Date();
-          today.setSeconds(0);
-          today.setMinutes(0);
-          today.setHours(0);
+          this.runnerId = parseInt(params.runnerId, 10);
+          const now = new Date();
+          const startOfToday = this.startOfDay(now.getTime());
 
-          this.isFilterToday = Math.floor(this.filterDate.getTime() / (60 * 60 * 24)) === Math.floor(today.getTime() / (60 * 60 * 24));
+          this.isFilterDateToday = this.filterDate.getTime() === startOfToday.getTime();
+
+          if (this.isFilterDateToday) {
+            const count = 24 - now.getHours();
+            now.setMilliseconds(0);
+            now.setSeconds(0);
+            now.setMinutes(0);
+            return this.viewModel.reservedSlots(now, this.runnerId, count);
+          }
 
           return this.viewModel.reservedSlots(this.filterDate, this.runnerId, 24);
         })
@@ -58,10 +61,10 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
         this.reserved = [];
         let currentDate = dates.shift();
 
-        for (let i = 0; i < 24; i++) {
-          const date = new Date(this.filterDate.getTime());
-          date.setMinutes(0);
-          date.setSeconds(0);
+        const startHour = this.isFilterDateToday ? (new Date()).getHours() : 0;
+
+        for (let i = startHour; i < 24; i++) {
+          const date = this.startOfDay(this.filterDate.getTime());
           date.setHours(i);
 
           if (currentDate && currentDate.getHours() === date.getHours()) {
@@ -94,5 +97,15 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
   nextDay(): void {
     this.filterDate = new Date(this.filterDate.getTime() + 60 * 60 * 24 * 1000);
     this.trigger.next(null);
+  }
+
+  startOfDay(time: number): Date {
+    const date = new Date(time);
+    date.setMilliseconds(0);
+    date.setSeconds(0);
+    date.setMinutes(0);
+    date.setHours(0);
+
+    return date;
   }
 }

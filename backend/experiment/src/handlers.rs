@@ -1,6 +1,7 @@
 use actix::Addr;
 use actix_web::{delete, get, HttpRequest, HttpResponse, post, put, web, web::Json};
 use actix_web_actors::ws;
+use chrono::Utc;
 use diesel::prelude::*;
 use log::error;
 use serde_json::json;
@@ -11,7 +12,7 @@ use core::ErrorMessage as CoreErrorMessage;
 use core::models::paginate::{CountStarOver, Paginate, Pagination, PaginationRequest};
 use core::responses::SuccessResponse;
 use core::sanitized::SanitizedJson;
-use core::schema::{experiments, jobs, runners};
+use core::schema::{experiments, jobs, runners, slots};
 use core::types::{DBPool, DefaultResponse, ModelId, Result};
 use core::utils::Hash;
 use shared::JoinServerRequest;
@@ -215,7 +216,7 @@ pub async fn run_experiment(
     let (experiment_id, runner_id) = ids.into_inner();
     let user_id = user.id;
 
-    let mut job = web::block(move || {
+    let mut job = web::block(move || -> Result<Job> {
         let experiment = experiments::table
             .filter(experiments::user_id.eq(user.id))
             .find(experiment_id)
@@ -225,9 +226,23 @@ pub async fn run_experiment(
             .find(runner_id)
             .first::<Runner>(&conn)?;
 
+        let now = Utc::now().naive_utc();
+
+        let slot_exist: bool = diesel::dsl::select(diesel::dsl::exists(
+            slots::table
+                .filter(slots::start_at.lt(&now).and(slots::end_at.gt(&now)))
+                .filter(slots::user_id.eq(user.id).and(slots::runner_id.eq(runner.id)))
+        ))
+            .get_result(&conn)?;
+
+        if !slot_exist {
+            return Err(Box::new(ErrorMessage::NotAllowedToRunForSlot));
+        }
+
         diesel::insert_into(jobs::table)
             .values((jobs::experiment_id.eq(experiment.id), jobs::runner_id.eq(runner.id), jobs::code.eq(experiment.code)))
             .get_result::<Job>(&conn)
+            .map_err(|e| e.into())
     })
         .await?;
 

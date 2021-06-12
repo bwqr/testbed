@@ -17,8 +17,8 @@ export class PaginationService {
 
   getPaginationFromParams(params: Params): PaginationParams {
     return {
-      perPage: parseInt(params.perPage || PaginationService.DEFAULT_PER_PAGE, 0),
-      page: parseInt(params.page || PaginationService.DEFAULT_PAGE, 0)
+      perPage: parseInt(params.perPage || PaginationService.DEFAULT_PER_PAGE, 10),
+      page: parseInt(params.page || PaginationService.DEFAULT_PAGE, 10)
     };
   }
 

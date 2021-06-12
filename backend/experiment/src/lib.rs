@@ -41,7 +41,8 @@ pub fn register(config: &mut web::ServiceConfig) {
 
 #[derive(Debug)]
 pub enum ErrorMessage {
-    UnknownRunner
+    UnknownRunner,
+    NotAllowedToRunForSlot
 }
 
 impl ErrorMessaging for ErrorMessage {
@@ -52,6 +53,11 @@ impl ErrorMessaging for ErrorMessage {
                 error_code: 100,
                 message: String::from("unknown_runner"),
             },
+            ErrorMessage::NotAllowedToRunForSlot => HttpError {
+                code: StatusCode::FORBIDDEN,
+                error_code: 101,
+                message: String::from("not_allowed_to_run_for_slot")
+            }
         }
     }
 }

@@ -3,11 +3,11 @@ import {MainComponent} from '../../../shared/components/main/main.component';
 import {ExperimentViewModelService} from '../../services/experiment-view-model.service';
 import {Experiment, JobUpdate, SlimJob, SlimRunner} from '../../models';
 import {ActivatedRoute} from '@angular/router';
-import {filter, finalize, map, switchMap} from 'rxjs/operators';
+import {catchError, filter, finalize, map, switchMap} from 'rxjs/operators';
 import {MainService} from '../../../core/services/main.service';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 import {combineLatest} from 'rxjs';
-import {Pagination} from '../../../core/models';
+import {ErrorMessage, Pagination} from '../../../core/models';
 import {WebSocketService} from '../../../core/services/web-socket.service';
 import {NotificationKind} from '../../../core/websocket/models';
 import {basicSetup, EditorState, EditorView} from '@codemirror/basic-setup';
@@ -147,7 +147,14 @@ export class ExperimentComponent extends MainComponent implements OnInit {
 
     this.subs.add(
       this.viewModel.runExperiment(this.experiment.id, value.runnerId).pipe(
-        finalize(() => this.leaveProcessingState())
+        finalize(() => this.leaveProcessingState()),
+        catchError(error => {
+          if (error instanceof ErrorMessage) {
+            this.service.alertFail(error.message.localized);
+          }
+
+          return Promise.reject(error);
+        })
       )
         .subscribe(job => {
           this.jobs.items.unshift([job, runner]);

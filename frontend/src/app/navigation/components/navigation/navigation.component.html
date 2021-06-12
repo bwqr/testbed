@@ -37,7 +37,7 @@
 </div>
 
 <div class="alerts position-fixed d-inline-block top-0 w-25 mw-100 m-4" style="right: 0">
-  <div class="mb-4 p-4 bg-white rounded border-start border-5 border-success d-flex flex-row" role="alert" *ngFor="let alert of alerts">
+  <div class="mb-4 p-4 bg-white rounded border-start border-5 border-{{alert.type}} d-flex flex-row" role="alert" *ngFor="let alert of alerts">
     <p class="flex-grow-1 m-0">{{alert.text}}</p>
     <button type="button" class="btn-close btn-sm" aria-label="Close" (click)="removeAlert(alert)">
     </button>

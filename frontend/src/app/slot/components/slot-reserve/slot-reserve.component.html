@@ -4,7 +4,7 @@
     <hr>
   </div>
   <div>
-    <button (click)="previousDay()" [disabled]="isFilterToday">previous</button>
+    <button (click)="previousDay()" [disabled]="isFilterDateToday">previous</button>
     {{filterDate | date: formats.shortDate}}
     <button (click)="nextDay()">next</button>
   </div>
