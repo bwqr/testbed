@@ -1,5 +1,5 @@
 use std::io::{Read, Write};
-use std::process::{ExitStatus, Stdio};
+use std::process::{Child, ExitStatus, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -88,22 +88,20 @@ impl Executor {
             .map_err(|e| Error::IO(e))
     }
 
-    fn run_transmitter_code(&self, script_dir: &str) -> Result<String, Error> {
-        let mut child = std::process::Command::new(self.docker_path.as_str())
-            .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
-            .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
-            .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
-            .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
-            .args(&["python", "/usr/local/scripts/job.py", "--transmitter"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| Error::Custom(format!("Failed to spawn transmitter process, {:?}", e)))?;
+    fn gather_outputs(child: Child) -> Result<String, Error> {
+        let mut output = String::new();
+        child.stdout.unwrap().read_to_string(&mut output)
+            .map_err(|e| Error::IO(e))?;
+        child.stderr.unwrap().read_to_string(&mut output)
+            .map_err(|e| Error::IO(e))?;
 
+        Ok(output)
+    }
+
+    fn wait_child_exit(mut child: Child, seconds: u32) -> Result<String, Error> {
         // wait 10 second until transmitter code exits
         let mut exited = false;
-        for _ in 0..10 {
+        for _ in 0..seconds {
             match child.try_wait() {
                 Ok(Some(status)) => {
                     exited = true;
@@ -114,13 +112,7 @@ impl Executor {
 
                     // if not successful, gather the outputs
                     if !status.success() {
-                        let mut output = String::new();
-                        child.stdout.unwrap().read_to_string(&mut output)
-                            .map_err(|e| Error::IO(e))?;
-                        child.stderr.unwrap().read_to_string(&mut output)
-                            .map_err(|e| Error::IO(e))?;
-
-                        return Err(Error::Output(output));
+                        return Err(Error::Output(Self::gather_outputs(child)?));
                     }
 
                     break;
@@ -134,14 +126,26 @@ impl Executor {
 
         if !exited {
             let _ = child.kill();
-            return Err(Error::Custom(String::from("transmitter code did not exit in 10 seconds")));
+            return Err(Error::Custom(String::from("child did not exit in 10 seconds")));
         }
 
-        let mut output = String::new();
-        child.stdout.unwrap().read_to_string(&mut output)
-            .map_err(|e| Error::IO(e))?;
+        Self::gather_outputs(child)
+    }
 
-        Ok(output)
+    fn run_transmitter_code(&self, script_dir: &str) -> Result<String, Error> {
+        let child = std::process::Command::new(self.docker_path.as_str())
+            .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
+            .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
+            .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
+            .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
+            .args(&["python", "/usr/local/scripts/job.py", "--transmitter"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| Error::Custom(format!("Failed to spawn transmitter process, {:?}", e)))?;
+
+        Self::wait_child_exit(child, 10)
     }
 
     fn start_receiver(&self, script_dir: &str) -> Result<std::process::Child, Error> {
@@ -168,33 +172,25 @@ impl Executor {
     fn start_transmitter(&self) -> Result<serial::SystemPort, Error> {
         let mut port = serial::open(self.tx_dev_path.as_str())
             .map_err(|e| Error::Serial(e))?;
-        port.set_timeout(Duration::from_secs(1))
+
+        // Wait 5 seconds for SETUP_MESSAGE
+        port.set_timeout(Duration::from_secs(5))
             .map_err(|e| Error::Serial(e))?;
 
         let mut buffer = [0 as u8; incoming::arduino::SETUP_MESSAGE.len()];
 
-        let mut error: Option<Error> = None;
-
         // read the START_MESSAGE message, we do not check if received buffer equals to START_MESSAGE since it is mostly equal.
-        // try 5 times to read a message
-        for _ in 0..5 {
-            match port.read(&mut buffer) {
-                Ok(_) => {
-                    error = None;
-                    break;
-                }
-                Err(e) => error = Some(Error::IO(e))
-            };
-        }
+        port.read(&mut buffer)
+            .map_err(|e| Error::IO(e))?;
 
-        if let Some(error) = error {
-            return Err(error);
-        }
+        // Other IO operations should have 1 second for timeout
+        port.set_timeout(Duration::from_secs(1))
+            .map_err(|e| Error::Serial(e))?;
 
         Ok(port)
     }
 
-    fn run_commands(&self, state: State, port: &mut serial::SystemPort, child: &mut std::process::Child) -> Result<ExitReason, Error> {
+    fn run_commands(&self, state: State, port: &mut serial::SystemPort, receiver: &mut std::process::Child) -> Result<ExitReason, Error> {
         let mut buff = [0 as u8; incoming::arduino::END_MESSAGE.len()];
 
         // clear previous characters from transmitter
@@ -207,8 +203,9 @@ impl Executor {
             port.write(command.as_bytes())
                 .map_err(|e| Error::IO(e))?;
 
+            // Loop until command is executed or receiver is terminated
             loop {
-                match child.try_wait() {
+                match receiver.try_wait() {
                     Ok(Some(status)) => {
                         port.write(END_DELIMITER_NEW_LINE.as_bytes())
                             .map_err(|e| Error::IO(e))?;
@@ -271,56 +268,27 @@ impl Executor {
         let mut port = self.start_transmitter()?;
 
         info!("starting the receiver");
-        let mut child = self.start_receiver(script_dir.as_str())?;
+        let mut receiver = self.start_receiver(script_dir.as_str())?;
 
         info!("running commands");
-        match self.run_commands(state, &mut port, &mut child) {
+        let output = match self.run_commands(state, &mut port, &mut receiver) {
             Ok(ExitReason::EndOfExperiment) => {
                 info!("experiment is ended");
 
                 std::net::TcpStream::connect("127.0.0.1:8011")
                     .map_err(|_| {
-                        let _ = child.kill();
+                        let _ = receiver.kill();
                         Error::Custom(String::from("Failed to connect receiver code over tcp"))
                     })?
                     .write(outgoing::tcp::END_MESSAGE.as_bytes())
                     .map_err(|_| {
-                        let _ = child.kill();
+                        let _ = receiver.kill();
                         Error::Custom(String::from("Failed to send END_MESSAGE to receiver code"))
                     })?;
 
-                let mut exited = false;
-                for _ in 0..10 {
-                    match child.try_wait() {
-                        Ok(Some(status)) => {
-                            info!("child is exited");
-                            exited = true;
+                info!("waiting for receiver to exit and generating the output");
 
-                            // if not successful, gather the outputs
-                            if !status.success() {
-                                let mut output = String::new();
-                                child.stdout.unwrap().read_to_string(&mut output)
-                                    .map_err(|e| Error::IO(e))?;
-                                child.stderr.unwrap().read_to_string(&mut output)
-                                    .map_err(|e| Error::IO(e))?;
-
-                                return Err(Error::Output(output));
-                            }
-
-                            break;
-                        }
-                        Ok(None) => {}
-                        Err(e) => return Err(Error::IO(e))
-                    }
-
-                    std::thread::sleep(Duration::from_secs(1));
-                }
-
-                if !exited {
-                    info!("killing the child");
-                    let _ = child.kill();
-                    return Err(Error::Custom(String::from("receiver code did not exit in 10 seconds")));
-                }
+                Self::wait_child_exit(receiver, 10)?
             }
             Ok(ExitReason::ChildExit(status)) => {
                 info!("child exited before experiment end");
@@ -335,30 +303,17 @@ impl Executor {
                 }
 
                 info!("child crashed");
-
-                // if not successful, gather the outputs
-                let mut output = String::new();
-                child.stdout.unwrap().read_to_string(&mut output)
-                    .map_err(|e| Error::IO(e))?;
-                child.stderr.unwrap().read_to_string(&mut output)
-                    .map_err(|e| Error::IO(e))?;
-
-                return Err(Error::Output(output));
+                return Err(Error::Output(Self::gather_outputs(receiver)?));
             }
             Err(e) => {
                 error!("unknown error while waiting for child exit");
                 // just kill everything without checking error and return error
                 let _ = port.write(END_DELIMITER_NEW_LINE.as_bytes());
-                let _ = child.kill();
+                let _ = receiver.kill();
 
                 return Err(e);
             }
-        }
-
-        let mut output = String::new();
-        info!("generating the output");
-        child.stdout.unwrap().read_to_string(&mut output)
-            .map_err(|e| Error::IO(e))?;
+        };
 
         info!("removing script dir");
         self.remove_dir(script_dir.as_str())?;
