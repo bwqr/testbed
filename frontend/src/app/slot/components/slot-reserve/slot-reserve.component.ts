@@ -2,10 +2,11 @@ import {Component, OnInit} from '@angular/core';
 import {MainComponent} from '../../../shared/components/main/main.component';
 import {SlotViewModelService} from '../../services/slot-view-model.service';
 import {ActivatedRoute} from '@angular/router';
-import {finalize, switchMap} from 'rxjs/operators';
+import {catchError, finalize, switchMap} from 'rxjs/operators';
 import {formats} from '../../../../defs';
 import {BehaviorSubject, combineLatest} from 'rxjs';
 import {MainService} from '../../../core/services/main.service';
+import {ErrorMessage} from '../../../core/models';
 
 @Component({
   selector: 'app-slot-reserve',
@@ -13,7 +14,7 @@ import {MainService} from '../../../core/services/main.service';
   styleUrls: ['./slot-reserve.component.scss']
 })
 export class SlotReserveComponent extends MainComponent implements OnInit {
-  reserved: { reserved: boolean; date: Date }[];
+  reservedSlots: { reserved: boolean; startAt: Date; endAt: Date }[];
 
   formats = formats;
 
@@ -25,12 +26,13 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
   trigger = new BehaviorSubject(null);
 
   get isPageReady(): boolean {
-    return !!this.reserved;
+    return !!this.reservedSlots;
   }
 
   constructor(
     private viewModel: SlotViewModelService,
     private activatedRoute: ActivatedRoute,
+    private service: MainService,
   ) {
     super();
     this.filterDate = this.startOfDay((new Date()).getTime());
@@ -58,20 +60,22 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
           return this.viewModel.reservedSlots(this.filterDate, this.runnerId, 24);
         })
       ).subscribe(dates => {
-        this.reserved = [];
+        this.reservedSlots = [];
         let currentDate = dates.shift();
 
         const startHour = this.isFilterDateToday ? (new Date()).getHours() : 0;
 
         for (let i = startHour; i < 24; i++) {
-          const date = this.startOfDay(this.filterDate.getTime());
-          date.setHours(i);
+          const startAt = this.startOfDay(this.filterDate.getTime());
+          startAt.setHours(i);
+          const endAt = new Date(startAt.getTime());
+          endAt.setMinutes(50);
 
-          if (currentDate && currentDate.getHours() === date.getHours()) {
-            this.reserved.push({reserved: true, date});
+          if (currentDate && currentDate.getHours() === startAt.getHours()) {
+            this.reservedSlots.push({reserved: true, startAt, endAt});
             currentDate = dates.shift();
           } else {
-            this.reserved.push({reserved: false, date});
+            this.reservedSlots.push({reserved: false, startAt, endAt});
           }
         }
       })
@@ -79,13 +83,29 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
   }
 
   reserveSlot(res: { reserved: boolean; date: Date }): void {
+    if (this.isInProcessingState) {
+      return;
+    }
+
     this.enterProcessingState();
+
     this.subs.add(
       this.viewModel.reserveSlot(res.date, this.runnerId)
         .pipe(
-          finalize(() => this.leaveProcessingState())
+          finalize(() => this.leaveProcessingState()),
+          catchError(errorMessage => {
+            if (errorMessage instanceof ErrorMessage) {
+              this.service.alertFail(errorMessage.message.localized);
+            }
+
+            return Promise.reject(errorMessage);
+          })
         )
-        .subscribe(() => res.reserved = true)
+        .subscribe(() => {
+          res.reserved = true;
+
+          this.service.alertSuccess('Slot is reserved successfully');
+        })
     );
   }
 

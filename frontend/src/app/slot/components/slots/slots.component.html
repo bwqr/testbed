@@ -1,0 +1,54 @@
+<div class="container mt-4">
+  <div class="mb-4">
+    <p class="fs-3">Slots</p>
+    <hr>
+  </div>
+
+  <ng-container *ngIf="isPageReady">
+    <div class="d-flex justify-content-end mb-4">
+      <form class="d-flex align-items-center flex-grow-1 justify-content-end"
+            (ngSubmit)="redirectToSlotReserve(formGroup.value)" [formGroup]="formGroup">
+        <select class="form-select form-select-sm" style="max-width: 300px" formControlName="runnerId"
+                id="runner-id">
+          <option value="" disabled selected hidden>Select a runner</option>
+          <option *ngFor="let runner of runners" [ngValue]="runner.id">{{runner.name}}</option>
+        </select>
+
+        <button class="btn btn-primary mx-2" type="submit" [disabled]="!formGroup.valid">
+          Reserve Slots for Runner
+        </button>
+      </form>
+    </div>
+
+    <div class="bg-white rounded-3 shadow-sm p-md-5 p-3">
+      <table class="table table-hover table-responsive-sm mb-4">
+        <thead>
+        <tr>
+          <th>Id</th>
+          <th>Runner</th>
+          <th>Start at</th>
+          <th>End at</th>
+          <th>Created at</th>
+          <th>Last updated at</th>
+          <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr *ngFor="let slot of slots">
+          <td><small>{{slot[0].id}}</small></td>
+          <td><small>{{slot[1].name}}</small></td>
+          <td><small>{{slot[0].startAt | date : formats.shortDate}}</small></td>
+          <td><small>{{slot[0].endAt | date : formats.shortDate}}</small></td>
+          <td><small>{{slot[0].createdAt | date : formats.shortDate}}</small></td>
+          <td><small>{{slot[0].updatedAt | date : formats.shortDate}}</small></td>
+          <td>
+            <button class="btn btn-outline-dark">
+              <small>Action</small>
+            </button>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </ng-container>
+</div>

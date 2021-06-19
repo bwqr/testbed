@@ -3,17 +3,45 @@
     <p class="fs-3">Reserve a Slot</p>
     <hr>
   </div>
-  <div>
-    <button (click)="previousDay()" [disabled]="isFilterDateToday">previous</button>
-    {{filterDate | date: formats.shortDate}}
-    <button (click)="nextDay()">next</button>
+  <div class="d-flex align-items-center mb-4">
+    <button class="btn btn-primary mx-2" (click)="previousDay()" [disabled]="isFilterDateToday">Previous Day</button>
+    <span>Slots for date: {{filterDate | date: formats.shortDate}}</span>
+    <button class="btn btn-primary mx-2" (click)="nextDay()">Next Day</button>
   </div>
-  <div class="row">
-    <div class="col-1 p-2" *ngFor="let res of reserved">
-      <div [ngStyle]="{'background': res.reserved ? 'red' : 'green'}" style="height: 100px">
-        <button (click)="reserveSlot(res)" [disabled]="res.reserved || isInProcessingState">Reserve</button>
-        {{res.date | date: formats.shortDate}}
-      </div>
-    </div>
+
+  <div class="bg-white rounded-3 shadow-sm p-md-5 p-3" *ngIf="isPageReady">
+    <table class="table table-hover table-responsive-sm mb-4">
+      <thead>
+      <tr>
+        <th>Start at</th>
+        <th>End at</th>
+        <th></th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr *ngFor="let slot of reservedSlots">
+        <td>{{slot.startAt | date: formats.shortDate}}</td>
+        <td>{{slot.endAt | date: formats.shortDate}}</td>
+        <td class="text-center">
+          <button class="btn btn-success" (click)="reserveSlot(slot)" *ngIf="!slot.reserved; else reserved">
+            <small>Reserve</small>
+          </button>
+          <ng-template #reserved>
+            <button class="btn btn-outline-danger rounded" disabled="disabled">Reserved</button>
+          </ng-template>
+        </td>
+      </tr>
+      </tbody>
+    </table>
   </div>
+
+  <!--  <div class="bg-white rounded-3 shadow-sm p-md-5 p-3">-->
+  <!--    <div class="row">-->
+  <!--      <div class="col-1 p-2" *ngFor="let slot of reservedSlots">-->
+  <!--        <div class="slot" [ngClass]="{'reserved': slot.reserved}">-->
+  <!--          <button *ngIf="!slot.reserved">Reserve</button>-->
+  <!--        </div>-->
+  <!--      </div>-->
+  <!--    </div>-->
+  <!--  </div>-->
 </div>

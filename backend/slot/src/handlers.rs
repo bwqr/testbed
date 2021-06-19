@@ -3,8 +3,9 @@ use chrono::{NaiveDateTime, Utc};
 use diesel::prelude::*;
 
 use core::responses::SuccessResponse;
-use core::schema::slots;
+use core::schema::{runners, slots};
 use core::types::{DBPool, ModelId, Result};
+use experiment::models::runner::{SLIM_RUNNER_COLUMNS, SlimRunner};
 use user::models::user::User;
 
 use crate::ErrorMessage;
@@ -17,7 +18,7 @@ const SLOT_IDLE_TIME: i64 = 60 * 10;
 
 /// returns all slots belonging to a user and not ended yet
 #[get("slots")]
-pub async fn fetch_slots(pool: web::Data<DBPool>, user: User) -> Result<Json<Vec<Slot>>> {
+pub async fn fetch_slots(pool: web::Data<DBPool>, user: User) -> Result<Json<Vec<(Slot, SlimRunner)>>> {
     let conn = pool.get().unwrap();
     let now = Utc::now().naive_utc();
 
@@ -25,7 +26,9 @@ pub async fn fetch_slots(pool: web::Data<DBPool>, user: User) -> Result<Json<Vec
         slots::table
             .filter(slots::end_at.gt(now))
             .filter(slots::user_id.eq(user.id))
-            .load::<Slot>(&conn)
+            .inner_join(runners::table)
+            .select((slots::all_columns, SLIM_RUNNER_COLUMNS))
+            .load::<(Slot, SlimRunner)>(&conn)
     )
         .await?;
 
@@ -78,7 +81,7 @@ pub async fn reserve_slot(pool: web::Data<DBPool>, user: User, reserve_request: 
 
     let mut now = Utc::now().timestamp();
     now -= now % 3600;
-    
+
     let mut start_at_timestamp = reserve_request.start_at.timestamp();
     // truncate time to hour
     start_at_timestamp -= start_at_timestamp % 3600;

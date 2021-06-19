@@ -8,6 +8,7 @@ import {Observable} from 'rxjs';
 import {map} from 'rxjs/operators';
 import {SuccessResponse} from '../../core/models';
 import {convertDateToLocal, convertDateToServerDate} from '../../helpers';
+import {SlimRunner} from '../../experiment/models';
 
 @Injectable({
   providedIn: 'root'
@@ -21,7 +22,7 @@ export class SlotViewModelService extends MainViewModelService {
     super(cacheService, requestService);
   }
 
-  slots(): Observable<Slot[]> {
+  slots(): Observable<[Slot, SlimRunner][]> {
     return this.requestService.makeGetRequest(routes.slot.slots.root);
   }
 

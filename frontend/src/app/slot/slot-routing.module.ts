@@ -1,10 +1,10 @@
 import { NgModule } from '@angular/core';
 import { Routes, RouterModule } from '@angular/router';
-import {SlotManagementComponent} from './components/slots/slot-management.component';
+import {SlotsComponent} from './components/slots/slots.component';
 import {SlotReserveComponent} from './components/slot-reserve/slot-reserve.component';
 
 const routes: Routes = [
-  {path: 'slots', component: SlotManagementComponent},
+  {path: 'slots', component: SlotsComponent},
   {path: 'slot/:runnerId/reserve', component: SlotReserveComponent}
 ];
 

@@ -2043,6 +2043,7 @@ dependencies = [
  "core",
  "derive",
  "diesel",
+ "experiment",
  "log",
  "serde",
  "user",

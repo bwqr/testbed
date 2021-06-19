@@ -7,6 +7,8 @@ import {Experiment, Job, SlimJob, SlimRunner} from '../models';
 import {routes} from '../../routes';
 import {Pagination, PaginationParams, SuccessResponse} from '../../core/models';
 import {HttpParams} from '@angular/common/http';
+import {map} from 'rxjs/operators';
+import {convertDateToLocal} from '../../helpers';
 
 @Injectable({
   providedIn: 'root'
@@ -29,7 +31,13 @@ export class ExperimentViewModelService extends MainViewModelService {
   }
 
   runExperiment(experimentId: number, runnerId: number): Observable<Job> {
-    return this.requestService.makePostRequest(`${routes.experiment.experiment}/${experimentId}/run/${runnerId}`, {});
+    return this.requestService.makePostRequest(`${routes.experiment.experiment}/${experimentId}/run/${runnerId}`, {}).pipe(
+      map(j => {
+        j.createdAt = convertDateToLocal(j.createdAt);
+        j.updatedAt = convertDateToLocal(j.updatedAt);
+        return j;
+      })
+    );
   }
 
   experimentJobs(experimentId: number, paginationParams?: PaginationParams): Observable<Pagination<[SlimJob, SlimRunner]>> {
@@ -42,7 +50,13 @@ export class ExperimentViewModelService extends MainViewModelService {
   }
 
   job(id: number): Observable<[Job, SlimRunner]> {
-    return this.requestService.makeGetRequest(`${routes.experiment.job}/${id}`);
+    return this.requestService.makeGetRequest(`${routes.experiment.job}/${id}`).pipe(
+      map(js => {
+        js[0].createdAt = convertDateToLocal(js[0].createdAt);
+        js[0].updatedAt = convertDateToLocal(js[0].updatedAt);
+        return js;
+      })
+    );
   }
 
   experiments(paginationParams?: PaginationParams): Observable<Pagination<Experiment>> {

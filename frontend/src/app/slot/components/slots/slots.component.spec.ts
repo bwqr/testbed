@@ -1,20 +1,20 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { SlotManagementComponent } from './slot-management.component';
+import { SlotsComponent } from './slots.component';
 
 describe('SlotsComponent', () => {
-  let component: SlotManagementComponent;
-  let fixture: ComponentFixture<SlotManagementComponent>;
+  let component: SlotsComponent;
+  let fixture: ComponentFixture<SlotsComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ SlotManagementComponent ]
+      declarations: [ SlotsComponent ]
     })
     .compileComponents();
   });
 
   beforeEach(() => {
-    fixture = TestBed.createComponent(SlotManagementComponent);
+    fixture = TestBed.createComponent(SlotsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
