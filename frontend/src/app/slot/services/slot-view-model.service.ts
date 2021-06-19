@@ -22,8 +22,23 @@ export class SlotViewModelService extends MainViewModelService {
     super(cacheService, requestService);
   }
 
+  private static mapSlot(slot: Slot): Slot {
+    slot.startAt = convertDateToLocal(slot.startAt);
+    slot.endAt = convertDateToLocal(slot.endAt);
+    slot.createdAt = convertDateToLocal(slot.createdAt);
+    slot.updatedAt = convertDateToLocal(slot.updatedAt);
+
+    return slot;
+  }
+
   slots(): Observable<[Slot, SlimRunner][]> {
-    return this.requestService.makeGetRequest(routes.slot.slots.root);
+    return this.requestService.makeGetRequest(routes.slot.slots.root).pipe(
+      map(slots => slots.map(ss => {
+          ss[0] = SlotViewModelService.mapSlot(ss[0]);
+          return ss;
+        })
+      )
+    );
   }
 
   reservedSlots(startAt: Date, runnerId: number, count: number): Observable<Date[]> {
@@ -36,5 +51,9 @@ export class SlotViewModelService extends MainViewModelService {
 
   reserveSlot(startAt: Date, runnerId: number): Observable<SuccessResponse> {
     return this.requestService.makePostRequest(routes.slot.slot, {startAt: convertDateToServerDate(startAt), runnerId});
+  }
+
+  cancelSlot(id: number): Observable<SuccessResponse> {
+    return this.requestService.makeDeleteRequest(`${routes.slot.slot}/${id}`);
   }
 }

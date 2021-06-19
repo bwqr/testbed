@@ -42,8 +42,8 @@
           <td><small>{{slot[0].createdAt | date : formats.shortDate}}</small></td>
           <td><small>{{slot[0].updatedAt | date : formats.shortDate}}</small></td>
           <td>
-            <button class="btn btn-outline-dark">
-              <small>Action</small>
+            <button class="btn btn-outline-dark" (click)="cancelSlot(slot[0].id)">
+              <small>Cancel slot</small>
             </button>
           </td>
         </tr>

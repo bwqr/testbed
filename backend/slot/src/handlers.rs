@@ -2,6 +2,8 @@ use actix_web::{delete, get, post, web, web::Json};
 use chrono::{NaiveDateTime, Utc};
 use diesel::prelude::*;
 
+use core::error::ErrorMessaging;
+use core::ErrorMessage as CoreErrorMessage;
 use core::responses::SuccessResponse;
 use core::schema::{runners, slots};
 use core::types::{DBPool, ModelId, Result};
@@ -125,14 +127,25 @@ pub async fn reserve_slot(pool: web::Data<DBPool>, user: User, reserve_request: 
 pub async fn delete_slot(pool: web::Data<DBPool>, user: User, slot_id: web::Path<ModelId>) -> Result<Json<SuccessResponse>> {
     let conn = pool.get().unwrap();
 
-    web::block(move ||
+    web::block(move || -> Result<_> {
+        let slot = slots::table
+            .filter(slots::user_id.eq(user.id))
+            .find(slot_id.into_inner())
+            .first::<Slot>(&conn)
+            .map_err(|e| Box::new(e) as Box<dyn ErrorMessaging>)?;
+
+        if slot.start_at.timestamp() < Utc::now().timestamp() {
+            return Err(Box::new(CoreErrorMessage::InvalidOperationForStatus));
+        }
+
         diesel::delete(
             slots::table
                 .filter(slots::user_id.eq(user.id))
-                .find(slot_id.into_inner())
+                .find(slot.id)
         )
             .execute(&conn)
-    )
+            .map_err(|e| e.into())
+    })
         .await?;
 
     Ok(Json(SuccessResponse::default()))

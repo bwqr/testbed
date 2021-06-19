@@ -8,13 +8,19 @@ import {BehaviorSubject, combineLatest} from 'rxjs';
 import {MainService} from '../../../core/services/main.service';
 import {ErrorMessage} from '../../../core/models';
 
+interface ReservedSlot {
+  reserved: boolean;
+  startAt: Date;
+  endAt: Date;
+}
+
 @Component({
   selector: 'app-slot-reserve',
   templateUrl: './slot-reserve.component.html',
   styleUrls: ['./slot-reserve.component.scss']
 })
 export class SlotReserveComponent extends MainComponent implements OnInit {
-  reservedSlots: { reserved: boolean; startAt: Date; endAt: Date }[];
+  reservedSlots: ReservedSlot[];
 
   formats = formats;
 
@@ -82,7 +88,7 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
     );
   }
 
-  reserveSlot(res: { reserved: boolean; date: Date }): void {
+  reserveSlot(res: ReservedSlot): void {
     if (this.isInProcessingState) {
       return;
     }
@@ -90,7 +96,7 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
     this.enterProcessingState();
 
     this.subs.add(
-      this.viewModel.reserveSlot(res.date, this.runnerId)
+      this.viewModel.reserveSlot(res.startAt, this.runnerId)
         .pipe(
           finalize(() => this.leaveProcessingState()),
           catchError(errorMessage => {

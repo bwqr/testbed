@@ -7,6 +7,9 @@ import {ExperimentViewModelService} from '../../../experiment/services/experimen
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
 import {formats} from '../../../../defs';
+import {MainService} from '../../../core/services/main.service';
+import {catchError, finalize} from 'rxjs/operators';
+import {ErrorMessage} from '../../../core/models';
 
 @Component({
   selector: 'app-slots',
@@ -33,6 +36,7 @@ export class SlotsComponent extends MainComponent implements OnInit {
     private formBuilder: FormBuilder,
     private router: Router,
     private activatedRoute: ActivatedRoute,
+    private service: MainService,
   ) {
     super();
 
@@ -55,5 +59,34 @@ export class SlotsComponent extends MainComponent implements OnInit {
     this.router.navigate(['../slot', values.runnerId, 'reserve'], {
       relativeTo: this.activatedRoute
     }).then();
+  }
+
+  cancelSlot(id: number): void {
+    if (this.isInProcessingState) {
+      return;
+    }
+
+    this.enterProcessingState();
+
+    this.subs.add(
+      this.viewModel.cancelSlot(id).pipe(
+        finalize(() => this.leaveProcessingState()),
+        catchError(errorMessage => {
+          if (errorMessage instanceof ErrorMessage) {
+            this.service.alertFail(errorMessage.message.localized);
+          }
+
+          return Promise.reject(errorMessage);
+        })
+      )
+        .subscribe(() => {
+          this.service.alertSuccess('Slot is cancelled');
+          const index = this.slots.findIndex(s => s[0].id === id);
+
+          if (index > -1) {
+            this.slots.splice(index, 1);
+          }
+        })
+    );
   }
 }
