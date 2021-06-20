@@ -15,7 +15,6 @@ table! {
         experiment_id -> Int4,
         runner_id -> Int4,
         code -> Text,
-        output -> Nullable<Text>,
         status -> Varchar,
         created_at -> Timestamp,
         updated_at -> Timestamp,

@@ -16,6 +16,8 @@ pub fn register(config: &mut web::ServiceConfig) {
         .service(
             web::scope("/api/experiment")
                 .service(handlers::join_server)
+                .service(handlers::storage::store_job_output)
+
                 .service(
                     web::scope("")
                         .wrap(Auth)
@@ -25,6 +27,7 @@ pub fn register(config: &mut web::ServiceConfig) {
                         .service(handlers::fetch_experiment)
                         .service(handlers::fetch_experiment_jobs)
                         .service(handlers::fetch_job)
+                        .service(handlers::storage::download_job_output)
                         .service(handlers::create_new_experiment)
                         .service(handlers::update_experiment_name)
                         .service(handlers::update_experiment_code)
@@ -42,7 +45,8 @@ pub fn register(config: &mut web::ServiceConfig) {
 #[derive(Debug)]
 pub enum ErrorMessage {
     UnknownRunner,
-    NotAllowedToRunForSlot
+    NotAllowedToRunForSlot,
+    OutputAlreadyExist,
 }
 
 impl ErrorMessaging for ErrorMessage {
@@ -56,7 +60,12 @@ impl ErrorMessaging for ErrorMessage {
             ErrorMessage::NotAllowedToRunForSlot => HttpError {
                 code: StatusCode::FORBIDDEN,
                 error_code: 101,
-                message: String::from("not_allowed_to_run_for_slot")
+                message: String::from("not_allowed_to_run_for_slot"),
+            },
+            ErrorMessage::OutputAlreadyExist => HttpError {
+                code: StatusCode::CONFLICT,
+                error_code: 102,
+                message: String::from("output_already_exist"),
             }
         }
     }

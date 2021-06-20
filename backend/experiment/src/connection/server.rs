@@ -264,12 +264,10 @@ impl Handler<RunResultMessage> for ExperimentServer {
             // clone required vals
             let job_id = msg.job_id;
             let status_clone = status.clone();
-            // encode the received output from runner
-            let encoded_output = core::encode_minimal(msg.output.as_str());
 
             let res = web::block(move || {
                 diesel::update(jobs::table.find(msg.job_id))
-                    .set((jobs::status.eq(status.value()), jobs::output.eq(Some(encoded_output))))
+                    .set(jobs::status.eq(status.value()))
                     .execute(&conn)?;
 
                 experiments::table

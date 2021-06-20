@@ -25,7 +25,6 @@ pub mod server {
     #[derive(Deserialize, Serialize)]
     pub struct RunResult {
         pub job_id: ModelId,
-        pub output: String,
         pub successful: bool,
     }
 

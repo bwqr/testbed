@@ -33,7 +33,7 @@ pub struct Connection {
     // this is the delay until we try connecting again
     current_timing_index: usize,
     executor: Option<Recipient<RunMessage>>,
-    pending_messages: Vec<Message>,
+    pending_messages: Vec<RunResultMessage>,
     runner_state: RunnerState,
 }
 
@@ -102,7 +102,7 @@ impl Connection {
         }).unwrap();
 
         Client::new()
-            .ws(format!("{}?{}", server_url, queries))
+            .ws(format!("{}/experiment/ws?{}", server_url, queries))
             .connect()
             .await
             .map(|f| f.1)
@@ -120,17 +120,24 @@ impl Connection {
                         Self::add_stream(stream, ctx);
                         act.sink = Some(SinkWrite::new(sink, ctx));
 
-                        // try to send pending messages
-                        let mut failed_messages = Vec::<Message>::new();
-                        // in order to borrow the sink, we have to do 'let Some' pattern. It should always pass this check
-                        if let Some(sink) = &mut act.sink {
-                            act.pending_messages.drain(..).for_each(|message| {
-                                if let Some(message) = sink.write(message) {
-                                    failed_messages.push(message);
-                                }
-                            });
+                        let mut pending_messages = Vec::<RunResultMessage>::new();
+                        std::mem::swap(&mut pending_messages, &mut act.pending_messages);
+
+                        while let Some(msg) = pending_messages.pop() {
+                            Self::upload_output_to_server(msg, act.server_url.clone(), act.access_token.clone())
+                                .into_actor(act)
+                                .then(|res, act, _| {
+                                    let (msg, sent) = res;
+                                    if sent {
+                                        act.send_msg_to_server(msg);
+                                    } else {
+                                        act.pending_messages.push(msg);
+                                    }
+
+                                    fut::ready(())
+                                })
+                                .spawn(ctx);
                         }
-                        act.pending_messages = failed_messages;
 
                         // we have connected now, reset timing
                         act.current_timing_index = 0;
@@ -151,6 +158,37 @@ impl Connection {
                 fut::ready(())
             })
             .spawn(ctx);
+    }
+
+    fn serialize_result(msg: &RunResultMessage) -> Message {
+        Message::Text(serde_json::to_string(&server::SocketMessage {
+            kind: server::SocketMessageKind::RunResult,
+            data: server::RunResult {
+                job_id: msg.job_id,
+                successful: msg.successful,
+            },
+        }).unwrap())
+    }
+
+    // returns the msg on error
+    async fn upload_output_to_server(msg: RunResultMessage, server_url: String, access_token: String) -> (RunResultMessage, bool) {
+        match Client::new()
+            .post(format!("{}/experiment/job/{}/output?token={}", server_url, msg.job_id, access_token))
+            .send_body(&msg.output)
+            .await {
+            Ok(_) => (msg, true),
+            Err(_) => (msg, false)
+        }
+    }
+
+    fn send_msg_to_server(&mut self, msg: RunResultMessage) {
+        if let Some(sink) = &mut self.sink {
+            if let Some(_) = sink.write(Self::serialize_result(&msg)) {
+                self.pending_messages.push(msg);
+            }
+        } else {
+            self.pending_messages.push(msg);
+        }
     }
 }
 
@@ -217,26 +255,22 @@ impl Handler<RunnerReceiversValueMessage> for Connection {
 impl Handler<RunResultMessage> for Connection {
     type Result = ();
 
-    fn handle(&mut self, msg: RunResultMessage, _: &mut Self::Context) {
+    fn handle(&mut self, msg: RunResultMessage, ctx: &mut Self::Context) {
         self.runner_state = RunnerState::Idle;
 
-        let message = Message::Text(serde_json::to_string(&server::SocketMessage {
-            kind: server::SocketMessageKind::RunResult,
-            data: server::RunResult {
-                job_id: msg.job_id,
-                output: msg.output,
-                successful: msg.successful,
-            },
-        }).unwrap());
+        Self::upload_output_to_server(msg, self.server_url.clone(), self.access_token.clone())
+            .into_actor(self)
+            .then(move |res, act, _| {
+                let (msg, sent) = res;
+                if sent {
+                    act.send_msg_to_server(msg)
+                } else {
+                    act.pending_messages.push(msg);
+                }
 
-        if let Some(sink) = &mut self.sink {
-            // if write returns the message, sending was not successful, try to send it next time
-            if let Some(message) = sink.write(message) {
-                self.pending_messages.push(message);
-            }
-        } else { // if connection is not available, send it next time
-            self.pending_messages.push(message);
-        }
+                fut::ready(())
+            })
+            .spawn(ctx);
     }
 }
 

@@ -37,6 +37,7 @@ pub enum ErrorMessage {
     Forbidden,
     MiddlewareFailed,
     Custom(&'static str),
+    IOError
 }
 
 impl ErrorMessaging for ErrorMessage {
@@ -121,6 +122,11 @@ impl ErrorMessaging for ErrorMessage {
                 code: StatusCode::INTERNAL_SERVER_ERROR,
                 error_code: 116,
                 message: String::from(*str),
+            },
+            ErrorMessage::IOError => HttpError {
+                code: StatusCode::INTERNAL_SERVER_ERROR,
+                error_code: 116,
+                message: String::from("io_error"),
             },
         }
     }

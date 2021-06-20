@@ -15,7 +15,6 @@ pub struct Job {
     pub experiment_id: ModelId,
     pub runner_id: ModelId,
     pub code: String,
-    pub output: Option<String>,
     pub status: JobStatus,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,

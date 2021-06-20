@@ -1,4 +1,5 @@
 use std::io::{Read, Write};
+use std::net::SocketAddr;
 use std::process::{Child, ExitStatus, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -99,7 +100,7 @@ impl Executor {
     }
 
     fn wait_child_exit(mut child: Child, seconds: u32) -> Result<String, Error> {
-        // wait 10 second until transmitter code exits
+        // wait given amount of seconds until transmitter code exits
         let mut exited = false;
         for _ in 0..seconds {
             match child.try_wait() {
@@ -126,7 +127,7 @@ impl Executor {
 
         if !exited {
             let _ = child.kill();
-            return Err(Error::Custom(String::from("child did not exit in 10 seconds")));
+            return Err(Error::Custom(format!("Child is failed to exit in 10 seconds\n {}", Self::gather_outputs(child)?)));
         }
 
         Self::gather_outputs(child)
@@ -275,10 +276,11 @@ impl Executor {
             Ok(ExitReason::EndOfExperiment) => {
                 info!("experiment is ended");
 
-                std::net::TcpStream::connect("127.0.0.1:8011")
+
+                std::net::TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], 8011)), Duration::from_secs(10))
                     .map_err(|_| {
                         let _ = receiver.kill();
-                        Error::Custom(String::from("Failed to connect receiver code over tcp"))
+                        Error::Custom(String::from("Failed tp connect receiver"))
                     })?
                     .write(outgoing::tcp::END_MESSAGE.as_bytes())
                     .map_err(|_| {

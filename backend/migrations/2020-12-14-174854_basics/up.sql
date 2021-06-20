@@ -66,7 +66,6 @@ create table jobs
     experiment_id integer            NOT NULL,
     runner_id     integer            NOT NULL,
     code          text               NOT NULL,
-    output        text,
     status        varchar(11)        NOT NULL DEFAULT 'Pending' CHECK ( status in ('Pending', 'Running', 'Successful', 'Failed') ),
     created_at    timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
