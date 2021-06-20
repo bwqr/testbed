@@ -1,12 +1,14 @@
 import {Component, ElementRef, OnInit, ViewChild} from '@angular/core';
 import {MainComponent} from '../../../shared/components/main/main.component';
-import {Job, SlimRunner} from '../../models';
+import {Job, JobStatus, SlimRunner} from '../../models';
 import {ExperimentViewModelService} from '../../services/experiment-view-model.service';
 import {ActivatedRoute} from '@angular/router';
 import {switchMap} from 'rxjs/operators';
 import {basicSetup, EditorState, EditorView} from '@codemirror/basic-setup';
 import {python} from '@codemirror/lang-python';
 import {formats} from '../../../../defs';
+import {environment} from '../../../../environments/environment';
+import {AuthService} from '../../../auth/services/auth.service';
 
 
 @Component({
@@ -17,8 +19,11 @@ import {formats} from '../../../../defs';
 export class JobComponent extends MainComponent implements OnInit {
 
   job: Job;
+  outputLink: string;
+
+  jobStatuses = JobStatus;
+
   runner: SlimRunner;
-  renderedOutput: string;
 
   @ViewChild('code') code: ElementRef;
 
@@ -32,6 +37,7 @@ export class JobComponent extends MainComponent implements OnInit {
 
   constructor(
     private viewModel: ExperimentViewModelService,
+    private authService: AuthService,
     private activatedRoute: ActivatedRoute
   ) {
     super();
@@ -43,14 +49,13 @@ export class JobComponent extends MainComponent implements OnInit {
         switchMap(params => this.viewModel.job(params.id))
       ).subscribe(([job, runner]) => {
         this.job = job;
+        this.outputLink = `${environment.apiEndpoint}/experiment/job/${job.id}/output?token=${this.authService.getToken()}`;
         this.runner = runner;
 
         // experiment.code is html encoded, we need to decode it
         const el = document.createElement('textarea');
         el.innerHTML = this.job.code;
         const renderedCode = el.textContent;
-        el.innerHTML = this.job.output;
-        this.renderedOutput = el.textContent;
 
         // experiment.code is html encoded, we need to decode it
         this.editor = new EditorView({

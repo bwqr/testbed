@@ -35,7 +35,13 @@
       <div class="col" *ngIf="isPageReady">
         <h1 class="fs-4">Output</h1>
         <hr>
-        {{renderedOutput}}
+        <a class="btn w-100 btn-success" target="_blank" [href]="outputLink"
+           *ngIf="job.status === jobStatuses.Successful || job.status === jobStatuses.Failed; else outputNotAvailable">
+          Download the output
+        </a>
+        <ng-template #outputNotAvailable>
+          <p>There is no output to show right now.</p>
+        </ng-template>
       </div>
     </div>
 

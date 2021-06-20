@@ -26,7 +26,6 @@ export interface SlimJob {
 
 export interface Job extends SlimJob {
   code: string;
-  output?: string;
 }
 
 
@@ -38,6 +37,6 @@ export interface JobUpdate extends NotificationData {
 export enum JobStatus {
   Pending = 'Pending',
   Running = 'Running',
-  Successfull = 'Successfull',
+  Successful = 'Successful',
   Failed = 'Failed'
 }
