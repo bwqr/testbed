@@ -24,7 +24,7 @@ You may need to read the **API** part in order to understand these examples deep
 
 In the frontend part, you can create experiment and write a Python code that describes the experiment. You can both
 control the transmitter and receiver. You are expected to write one piece of Python code that handles both transmitter
-part and receiver part. In one piece of code, you can differentiate if you are executing the transmitter code or
+part and receiver part. In one piece of code, you can differentiate that if you are executing the transmitter code or
 receiver code by looking program arguments. If second argument ```sys.argv[1]``` equals to ```--transmitter```, you are
 executing the transmitter part. if it equals to ```--receiver```, you are executing the receiver part.
 
