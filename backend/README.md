@@ -48,11 +48,11 @@ official [docker](https://www.docker.com/) page.
 
 ## Configuration
 
-There are two files for configuration ```testbed/.env``` and ```api/.env```. Since these files are system specific, they
-do not exist in the repo. Hence, you will need to copy ```testbed/.env.example``` to ```testbed/.env```
-and ```api/env.example``` to ```api/.env``` in order to obtaion configuration files. You should configure **
-DATABASE_URL** inside the ```api/.env``` as we have done in diesel migration part. Another required configuration is
-docker path. You must specify docker path in the ```testbed/.env``` file.
+There are two files for configuration ```controller/.env``` and ```api/.env```. Since these files are system specific, they
+do not exist in the repo. Hence, you will need to copy ```controller/.env.example``` to ```controller/.env```
+and ```api/env.example``` to ```api/.env``` in order to obtaion configuration files. You should configure **DATABASE_URL**
+inside the ```api/.env``` as we have done in diesel migration part. Another required configuration is
+docker path. You must specify docker path in the ```controller/.env``` file.
 
 Lets specify the meanings of each entry,
 
@@ -62,24 +62,24 @@ Lets specify the meanings of each entry,
   ```postgres://<username>:<password>@localhost/<database>```
 * RUST_LOG: specify the log level of application.
 * ENV: specify the development environment.
-* APP_BIND_ADDRESS: the address server listens tcp connections.
+* APP_BIND_ADDRESS: the address that server listens for tcp connections.
 * ALLOWED_ORIGIN: specifies the origin where the requests come to the server. This enables CORS for this origin.
 * WEB_APP_URL: web application url
 * SECRET_KEY: This is application's secret key. It is used for cryptographic operations.
 * STORAGE_PATH: specifies the storage path of application.
 
-You do not need to change anything other than DATABASE_URL environment variable.
+You do not need to change anything other than **DATABASE_URL** environment variable.
 
-```testbed/.env.example```
+```controller/.env.example```
 
 * RUST_LOG: specify the log level of application.
-* SERVER_URL: The websocket connection url of the backend, Testbed connects over this url.
+* SERVER_URL: The websocket connection url of the backend, Controller connects over this url.
 * DOCKER_PATH: path to the docker executable.
 * TRANSMITTER_DEVICE_PATH: USB device path for transmitter device
 * RECEIVER_DEVICE_PATHS: USB device paths for receiver devices. You can specify multiple devices by separating them with
   comma
-* PYTHON_LIB_PATH: path to experiment python lib
-* BACKEND_ACCESS_TOKEN: Testbed uses this token to connect to the backend.
+* PYTHON_LIB_PATH: path to experiment python lib, please checkout [project](https://github.com/nanonetworking/kr-testbed-api/tree/master/experiment) for details
+* BACKEND_ACCESS_TOKEN: Controller uses this token to connect to the backend.
 
 Prior to first run, you should place appropriate values for DOCKER_PATH, TRANSMITTER_DEVICE_PATH, RECEIVER_DEVICE_PATHS
 and PYTHON_LIB_PATH according to your development environment.
