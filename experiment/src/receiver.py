@@ -57,7 +57,20 @@ class Receiver:
         start_time = time.monotonic_ns()
 
         for dev in self.__devs:
-            read_data.append(int(dev.read()))
+            dev.flushInput()
+            result = b''
+
+            while dev.read() != b' ':
+                pass
+            dev.read()  # \r
+            dev.read()  # \n
+
+            val = dev.read()
+            while val != b' ':
+                result += val
+                val = dev.read()
+
+            read_data.append(result)
 
         # in seconds
         elapsed_time = (time.monotonic_ns() - start_time) / 1_000_000_000
