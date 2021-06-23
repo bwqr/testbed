@@ -254,16 +254,16 @@ impl Executor {
             .map_err(|e| Error::Custom(format!("Unable to decode state, {:?}", e)))?;
 
         // apply sanity checks
-        info!("applying sanity checks");
-        let execution_time = state.execution_time();
-        if execution_time > limits::MAX_EXECUTION_TIME {
-            return Err(Error::Custom(format!("Max execution time is reached, execution time: {}", execution_time)));
-        }
-
-        let emit_time = state.emit_time();
-        if emit_time > limits::MAX_EMIT_TIME {
-            return Err(Error::Custom(format!("Max emit time is reached, emit time: {}", emit_time)));
-        }
+        // info!("applying sanity checks");
+        // let execution_time = state.execution_time();
+        // if execution_time > limits::MAX_EXECUTION_TIME {
+        //     return Err(Error::Custom(format!("Max execution time is reached, execution time: {}", execution_time)));
+        // }
+        //
+        // let emit_time = state.emit_time();
+        // if emit_time > limits::MAX_EMIT_TIME {
+        //     return Err(Error::Custom(format!("Max emit time is reached, emit time: {}", emit_time)));
+        // }
 
         info!("starting the transmitter");
         let mut port = self.start_transmitter()?;

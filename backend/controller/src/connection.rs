@@ -170,7 +170,6 @@ impl Connection {
         }).unwrap())
     }
 
-    // returns the msg on error
     async fn upload_output_to_server(msg: RunResultMessage, server_url: String, access_token: String) -> (RunResultMessage, bool) {
         match Client::new()
             .post(format!("{}/experiment/job/{}/output?token={}", server_url, msg.job_id, access_token))
