@@ -156,7 +156,7 @@ impl Decoder {
                 let mut sprays = [false; NUM_SPRAY];
 
                 spray_emits.char_indices()
-                    .for_each(|(i, emit)| sprays[i] = emit == 'i');
+                    .for_each(|(i, emit)| sprays[i] = emit == '1');
 
                 let duration = lines.next()
                     .ok_or(Error::MalformedInput)?

@@ -1,6 +1,6 @@
 # kr-testbed-api
 
-This project enables an user to control nanonetworking testbed remotely by submitting his/her own code via web application.
+This project enables an user to control nanonetworking testbed remotely by submitting his/her own code via web application. For users who want to use NanoNetworking Testbed remotely, they should check the Testbed API part of this project.
 
 Project consists of five parts:
 * Backend
