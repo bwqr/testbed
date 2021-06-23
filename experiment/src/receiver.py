@@ -20,25 +20,27 @@ is_experiment_ended = False
 
 class Connection(threading.Thread):
     def __init__(self, *args, **kwargs):
+        self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__socket.bind(('0.0.0.0', 8011))
+        self.__socket.listen(1)
+        self.__socket.settimeout(1)
+
         super(Connection, self).__init__(*args, **kwargs)
 
     def run(self) -> None:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            global is_experiment_ended
+        global is_experiment_ended
 
-            sock.bind(('0.0.0.0', 8011))
-            sock.listen(1)
-            sock.settimeout(1)
-            # run until main thread terminates
-            while threading.main_thread().is_alive():
-                try:
-                    conn, addr = sock.accept()
-                    with conn:
-                        conn.recv(len(Incoming.Tcp.end_of_experiment))
-                        is_experiment_ended = True
-                # socket errors are ignored, like timeout
-                except socket.timeout:
-                    pass
+        # run until main thread terminates or receiving a connection
+        while threading.main_thread().is_alive():
+            try:
+                conn, addr = self.__socket.accept()
+                conn.close()
+                is_experiment_ended = True
+                break
+            except socket.timeout:
+                pass
+
+        self.__socket.close()
 
 
 class Receiver:
@@ -75,7 +77,7 @@ class Receiver:
 
 
 def run():
-    receiver = Receiver(['/dev/ttyUSB0'], 0.2)
+    receiver = Receiver(['/dev/ttyUSB1'], 0.2)
 
     ended, data = receiver.next()
     while not ended:
