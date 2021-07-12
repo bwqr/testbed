@@ -194,7 +194,8 @@ pub async fn reset_password(
         .render()
         .map_err(|_| CoreErrorMessage::AskamaError)?;
 
-    client_services.mail.send_mail(user.full_name(), user.email, text);
+    let full_name = user.full_name();
+    client_services.mail.send_mail(user.email, full_name, text);
 
 
     Ok(Json(SuccessResponse::default()))
