@@ -21,11 +21,6 @@ const ALPINE_VERSION: &str = "3.13";
 const SEND_RECEIVERS_VALUES_INTERVAL: u64 = 10;
 
 mod limits {
-    // in milliseconds
-    pub const MAX_EXECUTION_TIME: u32 = 50000;
-    // in milliseconds
-    pub const MAX_EMIT_TIME: u32 = 10000;
-    // in MB
     pub const MAX_MEMORY_USAGE: u32 = 512;
     // number of core
     pub const MAX_CPU_CORE: u32 = 1;
@@ -201,8 +196,11 @@ impl Executor {
             .map_err(|e| Error::IO(e))?;
 
         for command in state.into_iter() {
+            info!("{:?}", command);
             port.write(command.as_bytes())
                 .map_err(|e| Error::IO(e))?;
+
+            let mut total_read_size = 0;
 
             // Loop until command is executed or receiver is terminated
             loop {
@@ -218,9 +216,12 @@ impl Executor {
                 }
 
                 match port.read(&mut buff) {
-                    Ok(_) => {
-                        // transmitter most likely sent an end of experiment message, not need to check it
-                        break;
+                    Ok(size) => {
+                        total_read_size += size;
+
+                        if total_read_size >= incoming::arduino::END_MESSAGE.len() {
+                            break;
+                        }
                     }
                     Err(e) => {
                         match e.kind() {
@@ -252,18 +253,6 @@ impl Executor {
         info!("decoding the state");
         let state = Decoder::decode(serialized_state.as_str())
             .map_err(|e| Error::Custom(format!("Unable to decode state, {:?}", e)))?;
-
-        // apply sanity checks
-        // info!("applying sanity checks");
-        // let execution_time = state.execution_time();
-        // if execution_time > limits::MAX_EXECUTION_TIME {
-        //     return Err(Error::Custom(format!("Max execution time is reached, execution time: {}", execution_time)));
-        // }
-        //
-        // let emit_time = state.emit_time();
-        // if emit_time > limits::MAX_EMIT_TIME {
-        //     return Err(Error::Custom(format!("Max emit time is reached, emit time: {}", emit_time)));
-        // }
 
         info!("starting the transmitter");
         let mut port = self.start_transmitter()?;
