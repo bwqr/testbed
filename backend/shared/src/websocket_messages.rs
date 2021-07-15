@@ -39,7 +39,8 @@ pub mod client {
 
     #[derive(Deserialize, Serialize)]
     pub enum SocketMessageKind {
-        RunExperiment
+        RunExperiment,
+        AbortRunningJob
     }
 
     #[derive(Deserialize, Serialize)]
@@ -57,5 +58,10 @@ pub mod client {
     pub struct RunExperiment {
         pub job_id: ModelId,
         pub code: String,
+    }
+
+    #[derive(Deserialize, Serialize)]
+    pub struct AbortRunningJob {
+        pub job_id: ModelId,
     }
 }

@@ -7,7 +7,7 @@ use shared::RunnerState;
 use shared::SocketErrorKind;
 use shared::websocket_messages::{client, server};
 
-use crate::connection::messages::{DisconnectServerMessage, JoinServerMessage, RunMessage, RunResultMessage, UpdateRunnerValue};
+use crate::connection::messages::{DisconnectServerMessage, JoinServerMessage, RunMessage, RunResultMessage, UpdateRunnerValue, AbortRunningJob};
 use crate::connection::server::ExperimentServer;
 
 pub struct Session {
@@ -142,6 +142,17 @@ impl Handler<RunMessage> for Session {
         ctx.text(serde_json::to_string(&client::SocketMessage {
             kind: client::SocketMessageKind::RunExperiment,
             data: client::RunExperiment { job_id: msg.job_id, code: msg.code },
+        }).unwrap());
+    }
+}
+
+impl Handler<AbortRunningJob> for Session {
+    type Result = ();
+
+    fn handle(&mut self, msg: AbortRunningJob, ctx: &mut Self::Context) {
+        ctx.text(serde_json::to_string(&client::SocketMessage {
+            kind: client::SocketMessageKind::AbortRunningJob,
+            data: client::AbortRunningJob {job_id: msg.job_id}
         }).unwrap());
     }
 }

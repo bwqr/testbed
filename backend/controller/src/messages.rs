@@ -28,3 +28,7 @@ pub struct RunnerReceiversValueMessage {
 pub struct UpdateExecutorMessage {
     pub executor: Recipient<RunMessage>,
 }
+
+#[derive(Message)]
+#[rtype(result = "bool")]
+pub struct IsJobAborted;

@@ -48,3 +48,11 @@ pub struct ReceiverValues {
 impl Message for ReceiverValues {
     type Result = Result<Option<Vec<u8>>, ()>;
 }
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct AbortRunningJob {
+    pub job_id: ModelId,
+    pub runner_id: ModelId,
+}
+

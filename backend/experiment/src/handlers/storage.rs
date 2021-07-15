@@ -34,7 +34,12 @@ pub async fn download_job_output(pool: web::Data<DBPool>, job_id: web::Path<Mode
         .await?;
 
     let named_file = NamedFile::open(format!("{}/{}/output.txt", config.storage_path, job_id))
-        .map_err(|_| CoreErrorMessage::IOError)?
+        .map_err(|e| {
+            match e.kind() {
+                std::io::ErrorKind::NotFound => CoreErrorMessage::ItemNotFound,
+                _ => CoreErrorMessage::IOError
+            }
+        })?
         .set_content_disposition(actix_web::http::header::ContentDisposition {
             disposition: DispositionType::Attachment,
             parameters: vec![DispositionParam::Filename(String::from("output.txt"))],

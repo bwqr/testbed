@@ -10,7 +10,7 @@ use serial::core::SerialDevice;
 
 use crate::connection::Connection;
 use crate::executor::limits::{MAX_CPU_CORE, MAX_MEMORY_USAGE};
-use crate::messages::{RunMessage, RunnerReceiversValueMessage, RunResultMessage};
+use crate::messages::{RunMessage, RunnerReceiversValueMessage, RunResultMessage, IsJobAborted};
 use crate::ModelId;
 use crate::state::{Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, State};
 
@@ -122,7 +122,7 @@ impl Executor {
 
         if !exited {
             let _ = child.kill();
-            return Err(Error::Custom(format!("Child is failed to exit in 10 seconds\n {}", Self::gather_outputs(child)?)));
+            return Err(Error::Custom(format!("Child is failed to exit in {} seconds\n {}", seconds, Self::gather_outputs(child)?)));
         }
 
         Self::gather_outputs(child)
@@ -141,7 +141,7 @@ impl Executor {
             .spawn()
             .map_err(|e| Error::Custom(format!("Failed to spawn transmitter process, {:?}", e)))?;
 
-        Self::wait_child_exit(child, 10)
+        Self::wait_child_exit(child, 60)
     }
 
     fn start_receiver(&self, script_dir: &str) -> Result<std::process::Child, Error> {
@@ -195,8 +195,22 @@ impl Executor {
         port.write(START_DELIMITER_NEW_LINE.as_bytes())
             .map_err(|e| Error::IO(e))?;
 
+
         for command in state.into_iter() {
             info!("{:?}", command);
+            let connection = self.connection.clone();
+
+            let res = futures::executor::block_on(async move {
+                connection.send(IsJobAborted)
+                    .await
+            });
+
+            match res {
+                Ok(true) => return Err(Error::Custom(String::from("User aborted the job"))),
+                Ok(false) => {},
+                Err(e) => error!("Error while checking if job is aborted, {:?}", e)
+            }
+
             port.write(command.as_bytes())
                 .map_err(|e| Error::IO(e))?;
 
@@ -279,7 +293,7 @@ impl Executor {
 
                 info!("waiting for receiver to exit and generating the output");
 
-                Self::wait_child_exit(receiver, 10)?
+                Self::wait_child_exit(receiver, 60)?
             }
             Ok(ExitReason::ChildExit(status)) => {
                 info!("child exited before experiment end");
@@ -297,7 +311,6 @@ impl Executor {
                 return Err(Error::Output(Self::gather_outputs(receiver)?));
             }
             Err(e) => {
-                error!("unknown error while waiting for child exit");
                 // just kill everything without checking error and return error
                 let _ = port.write(END_DELIMITER_NEW_LINE.as_bytes());
                 let _ = receiver.kill();

@@ -18,6 +18,8 @@ use crate::connection::ReceiverValues;
 use crate::connection::session::Session;
 use crate::models::job::JobStatus;
 
+pub use crate::connection::messages::AbortRunningJob;
+
 struct ConnectedRunner {
     session: Addr<Session>,
     state: RunnerState,
@@ -306,6 +308,14 @@ impl Handler<UpdateRunnerValue> for ExperimentServer {
     }
 }
 
+impl Handler<AbortRunningJob> for ExperimentServer {
+    type Result = ();
+    fn handle(&mut self, msg: AbortRunningJob, _: &mut Self::Context) -> Self::Result {
+        if let Some(runner) = self.runners.get_mut(&msg.runner_id) {
+            runner.session.do_send(msg)
+        }
+    }
+}
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct JobUpdate {

@@ -27,6 +27,7 @@ pub fn register(config: &mut web::ServiceConfig) {
                         .service(handlers::fetch_experiment)
                         .service(handlers::fetch_experiment_jobs)
                         .service(handlers::fetch_job)
+                        .service(handlers::abort_running_job)
                         .service(handlers::storage::download_job_output)
                         .service(handlers::create_new_experiment)
                         .service(handlers::update_experiment_name)
