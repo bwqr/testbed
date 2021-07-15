@@ -4,6 +4,15 @@
     <hr>
   </div>
 
+  <div class="d-flex justify-content-end mb-4" *ngIf="isPageReady">
+    <button class="btn btn-danger mx-2" type="button" (click)="abortRunningJob()"
+            *ngIf="job.status === jobStatuses.Running || job.status === jobStatuses.Pending"
+            [disabled]="isInProcessingState">
+        Abort Running Job
+    </button>
+  </div>
+
+
   <div class="bg-white rounded-3 shadow-sm p-md-5 p-3">
     <table class="table table-hover table-borderless table-responsive-sm mb-4">
       <thead>

@@ -50,7 +50,7 @@ export class ExperimentComponent extends MainComponent implements OnInit {
   ) {
     super();
 
-    this.formGroup = formBuilder.group({
+    this.formGroup = this.formBuilder.group({
       runnerId: formBuilder.control('', [Validators.required]),
     });
 

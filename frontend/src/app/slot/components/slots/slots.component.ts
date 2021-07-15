@@ -40,7 +40,7 @@ export class SlotsComponent extends MainComponent implements OnInit {
   ) {
     super();
 
-    this.formGroup = formBuilder.group({
+    this.formGroup = this.formBuilder.group({
       runnerId: formBuilder.control('', [Validators.required])
     });
   }
@@ -55,7 +55,7 @@ export class SlotsComponent extends MainComponent implements OnInit {
     );
   }
 
-  redirectToSlotReserve(values): void {
+  redirectToSlotReserve(values: {runnerId: number}): void {
     this.router.navigate(['../slot', values.runnerId, 'reserve'], {
       relativeTo: this.activatedRoute
     }).then();

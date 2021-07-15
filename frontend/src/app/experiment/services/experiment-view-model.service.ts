@@ -76,4 +76,8 @@ export class ExperimentViewModelService extends MainViewModelService {
   updateExperiment(id: number, code: string): Observable<SuccessResponse> {
     return this.requestService.makePutRequest(`${routes.experiment.experiment}/${id}/code`, {code});
   }
+
+  abortRunningJob(id: number): Observable<SuccessResponse> {
+    return this.requestService.makeDeleteRequest(`${routes.experiment.job}/${id}/abort`);
+  }
 }
