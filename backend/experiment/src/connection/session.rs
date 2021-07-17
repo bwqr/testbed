@@ -28,9 +28,8 @@ impl Session {
 
     fn handle_msg(&self, msg: Message, ctx: &mut WebsocketContext<Self>) -> Result<(), SocketErrorKind> {
         match msg {
-            Message::Ping(_) | Message::Pong(_) => {
-                // self.hb = Instant::now()
-            }
+            Message::Ping(msg) => ctx.pong(&msg),
+            Message::Pong(_) => {}
             Message::Text(text) => {
                 let text = text.as_str();
 

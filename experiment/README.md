@@ -15,8 +15,8 @@ pip install -r requirements.txt
 ```
 
 After that point, the environment variable **PYTHON_LIB_PATH** in the ```controller/.env``` should point to the **src**
-directory. You also need to copy **pyserial** lib into **src** directory. **pyserial** should be in python site-packages
-directory.
+directory. You also need to copy **pyserial** lib into **src** directory. You can find **pyserial** in python site-packages
+directory as **serial** is lib's directory name.
 
 ## Example
 
@@ -154,7 +154,7 @@ Receiver helps you to read data from receiver devices in the testbed.
 |Method |Arguments| Return| Description|
 --- | --- | --- | ---
 |\_\_init\_\_|self, device_paths: List[str], sample_frequency: float |Receiver|Constructor of Receiver.|
-|next|self|Tuple[bool, List[int]]|A tuple with first element indicates if experiment is ended, second element gives the values read from receivers|
+|next|self|Tuple[bool, List[str]]|A tuple with first element indicates if experiment is ended, second element gives the values read from receivers|
 
 In the constructor of Receiver, the first argument is list of paths that includes the serial path of receivers. An
 example path of serial device can be ```/dev/ttyUSB0```. In the ```next``` function call, returned **List** length is

@@ -72,7 +72,7 @@ class Receiver:
                 result += val
                 val = dev.read()
 
-            read_data.append(result)
+            read_data.append(result.decode('utf-8'))
 
         # in seconds
         elapsed_time = (time.monotonic_ns() - start_time) / 1_000_000_000

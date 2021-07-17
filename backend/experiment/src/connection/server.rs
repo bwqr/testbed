@@ -52,6 +52,7 @@ impl ExperimentServer {
 
     async fn try_next_job(conn: PooledConnection<ConnectionManager<PgConnection>>, runner_id: ModelId) -> Option<RunExperiment> {
         web::block(move || {
+            // TODO https://trello.com/c/1qCVgmn6
             jobs::table
                 .inner_join(experiments::table)
                 .filter(jobs::status.eq(JobStatus::Pending.value()))
@@ -119,7 +120,8 @@ impl ExperimentServer {
                     Ok(_) => JobStatus::Running,
                     Err(e) => {
                         error!("Error while sending job to runner, {:?}", e);
-                        // TODO schedule another job, update runner state to Idle
+                        // TODO https://trello.com/c/nqKV1x8B
+                        // schedule another job, update runner state to Idle
                         JobStatus::Failed
                     }
                 };
@@ -171,8 +173,8 @@ impl Handler<RunExperiment> for ExperimentServer {
     fn handle(&mut self, msg: RunExperiment, ctx: &mut Self::Context) {
         info!("Job with id {} received ", msg.job_id);
 
-        if let Err(_) = self.run(msg, ctx) {
-            info!("Runner is in running state, will try to run next time")
+        if let Err(e) = self.run(msg, ctx) {
+            info!("Error while trying to run experiment, {:?}", e);
         }
     }
 }
@@ -181,11 +183,18 @@ impl Handler<JoinServerMessage> for ExperimentServer {
     type Result = ();
 
     fn handle(&mut self, msg: JoinServerMessage, ctx: &mut Self::Context) {
-        // clone some necessary vals
-        let runner_id = msg.runner_id;
+        // insert runner
+        self.runners.insert(msg.runner_id, ConnectedRunner {
+            state: msg.state.clone(),
+            session: msg.addr,
+            receiver_values: None,
+        });
 
-        if let RunnerState::Idle = &msg.state {
-            // try to run a job
+        if let RunnerState::Idle = msg.state {
+            // copy some necessary vals
+            let runner_id = msg.runner_id;
+
+           // try to run a job
             let conn = self.pool.get().unwrap();
             async move {
                 Self::try_next_job(conn, runner_id)
@@ -205,14 +214,7 @@ impl Handler<JoinServerMessage> for ExperimentServer {
                     fut::ready(())
                 })
                 .spawn(ctx);
-
-            // insert runner
-            self.runners.insert(msg.runner_id, ConnectedRunner {
-                state: msg.state,
-                session: msg.addr,
-                receiver_values: None,
-            });
-        }
+       }
     }
 }
 
