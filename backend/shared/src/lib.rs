@@ -6,14 +6,14 @@ pub mod websocket_messages;
 #[derive(Deserialize, Serialize, Clone)]
 pub enum RunnerState {
     Idle,
-    Running,
+    Running(i32),
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JoinServerRequest {
     pub token: String,
-    pub runner_state: RunnerState,
+    pub running_job_id: Option<i32>,
 }
 
 #[derive(Debug)]

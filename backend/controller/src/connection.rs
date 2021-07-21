@@ -24,7 +24,6 @@ type Write = SinkWrite<Message, SplitSink<Framed<BoxedSocket, Codec>, Message>>;
 const MAX_TIMING: usize = 5;
 
 const TIMINGS: [u8; MAX_TIMING] = [
-    // 0, 15, 30, 75, 120
     0, 2, 4, 6, 8,
 ];
 
@@ -32,7 +31,7 @@ pub struct Connection {
     server_url: String,
     access_token: String,
     sink: Option<Write>,
-    // this is the delay until we try connecting again
+    // this is the delay until we retry connecting to the server
     current_timing_index: usize,
     executor: Option<Recipient<RunMessage>>,
     pending_messages: Vec<RunResultMessage>,
@@ -60,9 +59,7 @@ impl Connection {
         ctx: &mut <Self as Actor>::Context,
     ) -> Result<(), SocketErrorKind> {
         match frame {
-            Frame::Ping(_) | Frame::Pong(_) => {
-                //update hb
-            }
+            Frame::Ping(_) | Frame::Pong(_) => {}
             Frame::Text(bytes) => {
                 let text = String::from_utf8(bytes.to_vec())
                     .map_err(|_| SocketErrorKind::InvalidMessage)?;
@@ -74,10 +71,7 @@ impl Connection {
 
                 match base.kind {
                     client::SocketMessageKind::RunExperiment => {
-                        let run_experiment = serde_json::from_str::<
-                            '_,
-                            client::SocketMessage<client::RunExperiment>,
-                        >(text)
+                        let run_experiment = serde_json::from_str::<'_, client::SocketMessage<client::RunExperiment>>(text)
                         .map_err(|_| SocketErrorKind::InvalidMessage)?;
 
                         info!(
@@ -86,7 +80,9 @@ impl Connection {
                         );
 
                         if let Some(executor) = &self.executor {
-                            self.runner_state = RunnerState::Running;
+                            self.runner_state = RunnerState::Running(run_experiment.data.job_id);
+                            // in any case, clear the is_job_aborted
+                            self.is_job_aborted = false;
 
                             let msg = RunMessage {
                                 job_id: run_experiment.data.job_id,
@@ -104,11 +100,17 @@ impl Connection {
                         }
                     }
                     client::SocketMessageKind::AbortRunningJob => {
-                        info!("Received abort message");
+                         let abort_job = serde_json::from_str::<'_, client::SocketMessage<client::AbortRunningJob>>(text)
+                        .map_err(|_| SocketErrorKind::InvalidMessage)?;
 
-                        if let RunnerState::Running = self.runner_state {
-                            info!("Setting is_job_aborted to true");
-                            self.is_job_aborted = true;
+                        info!("Received abort message");
+                        match self.runner_state {
+                            RunnerState::Running(job_id) if job_id == abort_job.data.job_id => {
+                                info!("Setting is_job_aborted to true");
+                                self.is_job_aborted = true;
+                            },
+                            RunnerState::Running(job_id) => error!("Server sent an abort message for a different job from current running job, received {}, running {}", abort_job.data.job_id, job_id),
+                            RunnerState::Idle => error!("Server sent an abort message even though controller is idle")
                         }
                     }
                 }
@@ -121,11 +123,11 @@ impl Connection {
     async fn connect(
         server_url: String,
         access_token: String,
-        runner_state: RunnerState,
+        running_job_id: Option<i32>
     ) -> Result<Framed<BoxedSocket, Codec>, WsClientError> {
         let queries = serde_urlencoded::to_string(JoinServerRequest {
             token: access_token,
-            runner_state,
+            running_job_id,
         })
         .unwrap();
 
@@ -137,10 +139,16 @@ impl Connection {
     }
 
     fn try_connect(act: &mut Connection, ctx: &mut <Self as Actor>::Context) {
+        let running_job_id = if let RunnerState::Running(job_id) = act.runner_state {
+            Some(job_id)
+        } else {
+            None
+        };
+
         Self::connect(
             act.server_url.clone(),
             act.access_token.clone(),
-            act.runner_state.clone(),
+            running_job_id,
         )
         .into_actor(act)
         .then(move |framed, act, ctx| {
@@ -220,17 +228,15 @@ impl Connection {
         server_url: String,
         access_token: String,
     ) -> (RunResultMessage, bool) {
-        match Client::new()
+        let res = Client::new()
             .post(format!(
                 "{}/experiment/job/{}/output?token={}",
                 server_url, msg.job_id, access_token
             ))
             .send_body(&msg.output)
-            .await
-        {
-            Ok(_) => (msg, true),
-            Err(_) => (msg, false),
-        }
+            .await;
+
+        (msg, res.is_ok())
     }
 
     fn send_msg_to_server(&mut self, msg: RunResultMessage) {
@@ -299,7 +305,7 @@ impl Handler<RunnerReceiversValueMessage> for Connection {
 
         if let Some(sink) = &mut self.sink {
             if let Some(_) = sink.write(message) {
-                error!("unable to send receiver status to server");
+                error!("unable to send receiver values to server");
             }
         }
     }

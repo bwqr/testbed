@@ -92,11 +92,11 @@ impl ExperimentServer {
         let mut runner: &mut ConnectedRunner = self.runners.get_mut(&experiment.runner_id)
             .ok_or("runner is not yet connected")?;
 
-        if let RunnerState::Running = &runner.state {
+        if let RunnerState::Running(_) = &runner.state {
             return Err("runner is already running an experiment");
         }
 
-        runner.state = RunnerState::Running;
+        runner.state = RunnerState::Running(experiment.job_id);
 
         // otherwise try to run experiment
         // clone some necessary vars
@@ -233,6 +233,8 @@ impl Handler<RunResultMessage> for ExperimentServer {
         info!("got result {} id {}", msg.successful, msg.job_id);
 
         if let Some(runner) = self.runners.get_mut(&msg.runner_id) {
+            // TODO Maybe runner sent an older job's result, so we should check if currently running job
+            // is equal to received msg.job_id
             runner.state = RunnerState::Idle;
             let conn = self.pool.get().unwrap();
             let runner_id = msg.runner_id;

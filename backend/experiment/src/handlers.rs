@@ -15,7 +15,7 @@ use core::schema::{experiments, jobs, runners, slots};
 use core::types::{DBPool, DefaultResponse, ModelId, Result};
 use core::utils::Hash;
 use core::ErrorMessage as CoreErrorMessage;
-use shared::JoinServerRequest;
+use shared::{JoinServerRequest, RunnerState};
 use user::models::user::User;
 
 use crate::connection::server::{ExperimentServer, RunExperiment, AbortRunningJob};
@@ -53,11 +53,17 @@ pub async fn join_server(
     })
     .await?;
 
+    let runner_state = if let Some(job_id) = join_server_request.running_job_id {
+        RunnerState::Running(job_id)
+    } else {
+        RunnerState::Idle
+    };
+
     ws::start(
         Session::new(
             experiment_server.get_ref().clone(),
             runner.id,
-            join_server_request.runner_state,
+            runner_state,
         ),
         &req,
         stream,
