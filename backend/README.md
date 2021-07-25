@@ -14,7 +14,7 @@ Required packages
 
 ### Rust - Cargo
 
-In order to bring the backend up, you should have a rust toolchain and cargo package manager installed on your system.
+In order to compile and produce an executable for both backend and controller, you should have a rust toolchain and cargo package manager installed on your system.
 You can checkout [rustup](https://rustup.rs/) for how to install a rust toolchain. After successfully installing rust
 and adding it to your PATH, we can install dependencies.
 
@@ -42,15 +42,15 @@ where **username**, **password** and **database** should be filled by you accord
 
 ### Docker
 
-In order to securely execute user's code in our environment, we are using container technology to isolate execution from
-host. If you want to test code execution, you will need to have docker installed on your system. You can checkout
+In order to securely execute user's code in the **controller** environment, we are using container technology to isolate execution from
+host. If you want to run some experiments, you will need to have docker installed on your system. You can checkout
 official [docker](https://www.docker.com/) page.
 
 ## Configuration
 
 There are two files for configuration ```controller/.env``` and ```api/.env```. Since these files are system specific, they
 do not exist in the repo. Hence, you will need to copy ```controller/.env.example``` to ```controller/.env```
-and ```api/env.example``` to ```api/.env``` in order to obtaion configuration files. You should configure **DATABASE_URL**
+and ```api/env.example``` to ```api/.env``` in order to obtain configuration files. You should configure **DATABASE_URL**
 inside the ```api/.env``` as we have done in diesel migration part. Another required configuration is
 docker path. You must specify docker path in the ```controller/.env``` file.
 
@@ -59,25 +59,24 @@ Lets specify the meanings of each entry,
 ```api/.env.example```
 
 * DATABASE_URL: this environment variable specifies the database that backend connects. The format is in the form of
-  ```postgres://<username>:<password>@localhost/<database>```
-* RUST_LOG: specify the log level of application.
-* ENV: specify the development environment.
-* APP_BIND_ADDRESS: the address that server listens for tcp connections.
-* ALLOWED_ORIGIN: specifies the origin where the requests come to the server. This enables CORS for this origin.
-* WEB_APP_URL: web application url
+  ```postgres://<username>:<password>@<postgresql-socket-address>/<database>```
+* RUST_LOG: specifies the log level of application. You can learn more about this variable from [here](https://docs.rs/env_logger/*/env_logger/index.html#enabling-logging).
+* ENV: specifies the development environment.
+* APP_BIND_ADDRESS: the address that backend listens for tcp connections.
+* ALLOWED_ORIGIN: specifies the origin where the requests come to the backend. This enables CORS for this origin. This should point to origin of running frontend project
+* WEB_APP_URL: Origin that backend is serving. One of the usage of this variable is sending backend related links to the user via email or other channels.
 * SECRET_KEY: This is application's secret key. It is used for cryptographic operations.
-* STORAGE_PATH: specifies the storage path of application.
+* STORAGE_PATH: specifies the storage path of backend.
 
 You do not need to change anything other than **DATABASE_URL** environment variable.
 
 ```controller/.env.example```
 
-* RUST_LOG: specify the log level of application.
-* SERVER_URL: The websocket connection url of the backend, Controller connects over this url.
+* RUST_LOG: specifies the log level of application. You can learn more about this variable from [here](https://docs.rs/env_logger/*/env_logger/index.html#enabling-logging).
+* SERVER_URL: The websocket connection url of the backend, Controller connects over this url to backend.
 * DOCKER_PATH: path to the docker executable.
 * TRANSMITTER_DEVICE_PATH: USB device path for transmitter device
-* RECEIVER_DEVICE_PATHS: USB device paths for receiver devices. You can specify multiple devices by separating them with
-  comma
+* RECEIVER_DEVICE_PATHS: USB device paths for receiver devices. You can specify multiple devices by separating them with comma
 * PYTHON_LIB_PATH: path to experiment python lib, please checkout [project](https://github.com/nanonetworking/kr-testbed-api/tree/master/experiment) for details
 * BACKEND_ACCESS_TOKEN: Controller uses this token to connect to the backend.
 
@@ -86,13 +85,13 @@ and PYTHON_LIB_PATH according to your development environment.
 
 ## Running
 
-We need two crates to be running. For backend
+We need two crates to be running. For backend run the command in api directory
 
 ```
 cargo run -p api
 ```
 
-for controller
+for controller run the command in controller directory
 
 ```
 cargo run -p controller

@@ -16,7 +16,13 @@ pip install -r requirements.txt
 
 After that point, the environment variable **PYTHON_LIB_PATH** in the ```controller/.env``` should point to the **src**
 directory. You also need to copy **pyserial** lib into **src** directory. You can find **pyserial** in python site-packages
-directory as **serial** is lib's directory name.
+directory as **serial** is lib's directory name. Your **src** directory should look like
+```
+    src
+    |   serial/         #lib related files inside the directory
+    |   receiver.py
+    |   transmitter.py
+```
 
 ## Example
 
@@ -45,8 +51,8 @@ from transmitter import State, WordEncoder, Spray
 
 
 def run_transmitter():
-    spray_duration = 500  # ms
-    pause_duration = 500  # ms
+    spray_duration = 500  # milliseconds
+    pause_duration = 500  # milliseconds
 
     state = State(WordEncoder())
     for i in range(0, 25):
@@ -164,7 +170,8 @@ you give a value of ```5```, a call to next function will be returned in **200**
 equal to zero will cause a ```ValueError``` exception.
 
 ```next``` function returns a two elements tuple. First element indicates if experiment ended or not, meaning all the
-commands in the transmitter part are executed. First time the experiment ended value returned True, you have 10 seconds
-to exit the program. If you exceed 10 seconds time limit, your program will be killed.
+commands in the transmitter part are executed. Second element is a list of str which are received from receiver devices.
+First time the experiment ended value returned True, you have 60 seconds
+to terminate your program. If you exceed 60 seconds time limit, your program will be killed.
 
 
