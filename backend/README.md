@@ -101,4 +101,4 @@ Hopefully, you can start sending requests to backend.
 
 ## RESTful API Documentation
 
-You can find a Postman collection under ```resources``` directory in this repository.
+You can find a OpenApi documentation in yaml format under ```resources``` directory.
