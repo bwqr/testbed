@@ -85,7 +85,7 @@ impl ErrorMessaging for ErrorMessage {
             },
             ErrorMessage::ItemNotFound => HttpError {
                 code: StatusCode::NOT_FOUND,
-                error_code: 101,
+                error_code: 102,
                 message: String::from("item_not_found"),
             },
             ErrorMessage::UnknownError => HttpError {

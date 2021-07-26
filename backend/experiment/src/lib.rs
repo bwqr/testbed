@@ -17,7 +17,6 @@ pub fn register(config: &mut web::ServiceConfig) {
             web::scope("/api/experiment")
                 .service(handlers::join_server)
                 .service(handlers::storage::store_job_output)
-
                 .service(
                     web::scope("")
                         .wrap(Auth)

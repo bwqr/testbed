@@ -47,7 +47,7 @@ impl ErrorMessaging for ErrorMessage {
             },
             ErrorMessage::Banned => HttpError {
                 code: StatusCode::UNPROCESSABLE_ENTITY,
-                error_code: 102,
+                error_code: 103,
                 message: String::from("banned"),
             }
         }
