@@ -1,0 +1,269 @@
+openapi: 3.0.1
+info:
+  title: Nanonetworking Testbed API
+  description: 'This application provides state management of Nanonetworking Testbed API project. You can find the project in [here](https://github.com/nanonetworking/kr-testbed-api).'
+  termsOfService: 'NO'
+  contact:
+    email: nrg@boun.edu.tr
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  version: 0.1-beta2
+externalDocs:
+  description: You can reach out the docs from here
+  url: https://github.com/nanonetworking/kr-testbed-api
+servers:
+- url: https://stapiac.westeurope.cloudapp.azure.com/api
+- url: http://127.0.0.1:8040/api
+tags:
+- name: auth
+  description: Authorization of user
+- name: experiment
+  description: Managing the experiments
+- name: slot
+  description: Managing the slots
+- name: user
+  description: User's information
+paths:
+  /auth/login:
+    post:
+      tags:
+      - auth
+      summary: Authorizes the given credentials and returns a token with a one day expire time
+      operationId: login
+      requestBody:
+        description: User's credentials
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        200:
+          description: Successful authorization
+          content: 
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/Token'
+        422:
+          description: Failed authorization. Reason can be invalid credentials, not verified user or banned user
+          content: 
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/InvalidCredentialsOrUser'
+                  - $ref: '#/components/schemas/NotVerified'
+                  - $ref: '#/components/schemas/Banned'
+  /auth/sign-up:
+    post:
+      tags:
+      - auth
+      summary: Creates a new user with given values
+      operationId: signUp
+      requestBody:
+        description: User's information
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+      responses:
+        200:
+          description: Successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        422:
+          description: At least one of the given values are invalid
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/UserExists'
+  /auth/forgot-password:
+    post:
+      tags:
+      - auth
+      summary: Sends a reset password email to given email address if it does exists
+      operationId: forgotPassword
+      requestBody:
+        description: Email of user
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        200:
+          description: Successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemNotFound'
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: hello@email.com
+        password:
+          type: string
+          format: password
+          example: password
+          minLength: 8
+          maxLength: 128
+      required:
+        - email
+        - password
+    SignUpRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          example: John
+          maxLength: 122
+        lastName:
+          type: string
+          example: Doe
+          maxLength: 122
+        email:
+          type: string
+          format: email
+          example: hello@email.com
+          maxLength: 255
+        password:
+          type: string
+          format: password
+          example: password
+          minLength: 8
+          maxLength: 128
+      required:
+        - firstName
+        - lastName
+        - email
+        - password
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: hello@email.com
+    Token:
+      type: object
+      properties:
+        token:
+          type: string
+          format: json-web-token
+          example: valid-token
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: success
+    ErrorMessage:
+      type: object
+      properties:
+        code: 
+          type: integer
+          example: 400
+        errorCode:
+          type: integer
+          example: 100
+        message:
+          type: string
+          example: error_message
+          format: snake-case
+    ValidationError:
+      allOf:
+        - $ref: '#/components/schemas/ErrorMessage'
+        - type: object
+          properties:
+            code:
+              example: 422
+            errorCode:
+              example: 1
+            message:
+              example: validation_errors
+            validationErrors:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    code:
+                      type: string
+                    message:
+                      type: string
+                      nullable: true
+                  
+    InvalidCredentialsOrUser:
+      allOf:
+        - $ref: '#/components/schemas/ErrorMessage'
+        - type: object
+          properties:
+            code:
+              example: 422
+            errorCode:
+              example: 101
+            message:
+              example: invalid_credentials
+    NotVerified:
+      allOf:
+        - $ref: '#/components/schemas/ErrorMessage'
+        - type: object
+          properties:
+            code:
+              example: 422
+            errorCode:
+              example: 102
+            message:
+              example: not_verified
+    Banned:
+      allOf:
+        - $ref: '#/components/schemas/ErrorMessage'
+        - type: object
+          properties:
+            code:
+              example: 422
+            errorCode:
+              example: 103
+            message:
+              example: banned
+    UserExists:
+      allOf:
+        - $ref: '#/components/schemas/ErrorMessage'
+        - type: object
+          properties:
+            code:
+              example: 422
+            errorCode:
+              example: 100
+            message:
+              example: user_exists
+    ItemNotFound:
+      allOf:
+        - $ref: '#/components/schemas/ErrorMessage'
+        - type: object
+          properties:
+            code:
+              example: 400
+            errorCode:
+              example: 102
+            message:
+              example: item_not_found
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
