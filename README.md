@@ -51,7 +51,7 @@ After running *backend* successfully, you can setup the *Testbed API* component.
 **An important note! *Testbed API* component must be setup in the same environment of *controller* component since *controller* will use *Testbed API*.**
 
 ### 3. Testbed Transmitter Device
-For this part, you just need to upload transmitter code into arduino device which is going to be use for Testbed Transmitter Device. You can open **testbed/transmitter/transmitter.ino** file with Arduino IDE and upload it to the device. Afterwards, you should setup the connections between arduino device and Nanonetworking Testbed's sprays.
+For this part, you just need to upload transmitter code into arduino device which is going to be used for Testbed Transmitter Device. You can open **testbed/transmitter/transmitter.ino** file with Arduino IDE and upload it to the device. Afterwards, you should setup the connections between arduino device and Nanonetworking Testbed's sprays.
 
 ### 4. Controller
 Later on, you can start running *controller* as described in the [backend](https://github.com/nanonetworking/kr-testbed-api/tree/master/backend). *Controller* component is designed to run on a linux machine. This linux machine must have docker installed. The linux machine also must have Transmitter and Receiver devices connected to itself via USB interface. In order to communicate with docker and control USB devices, the user used in linux machine must have required permissions. For docker, user should be in docker group. For USB devices, either user should own files belonging to the USB devices or user should be in the group which owns the USB devices. Otherwise, you will receive *Permission denied* error while trying to run an experiment.

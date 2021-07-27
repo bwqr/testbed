@@ -74,7 +74,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
         422:
-          description: At least one of the given values are invalid
+          description: At least one of the given values are invalid or missing
           content:
             application/json:
               schema:
@@ -106,6 +106,102 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ItemNotFound'
+  /auth/reset-password:
+    post:
+      tags:
+      - auth
+      summary: Resets password with a valid token sent via email
+      operationId: resetPassword
+      requestBody:
+        description: New password and valid token sent via email
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        200:
+          description: Password updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        401:
+          description: Invalid token provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidToken'
+        422:
+          description: At least one of the given values are invalid or missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+  /auth/verify-account:
+    post:
+      tags:
+      - auth
+      summary: Verify user account
+      operationId: verifyAccount
+      requestBody:
+        description: Token sent via email when user signed up
+        content:
+          application/json:
+            schema: 
+              $ref: '#/components/schemas/Token'
+      responses:
+        200:
+          description: User verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        401:
+          description: Invalid token provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidToken'
+        422:
+          description: User not in NotVerified status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidOperationForStatus'
+  /experiment/ws:
+    get:
+      tags:
+      - experiment
+      summary: Controller devices uses this endpoint to create websocket connection. Will not return until connection is closed
+      operationId: experimentWs
+      parameters:
+        - in: query
+          name: token
+          schema:
+            type: string
+          required: true
+          description: Token to authorize controller
+        - in: query
+          name: runningJobId
+          schema:
+            type: integer
+          description: Currently running job's id on controller if exists
+      responses:
+        200:
+          description: Connection closed
+        401:
+          description: Invalid token provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidToken'
+        404:
+          description: Unknown controller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemNotFound'
+
 components:
   schemas:
     LoginRequest:
@@ -158,6 +254,21 @@ components:
           type: string
           format: email
           example: hello@email.com
+      required:
+        - email
+    ResetPasswordRequest:
+      type: object
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          format: password,
+          minLength: 8
+          maxLength: 128
+      required:
+        - token
+        - password
     Token:
       type: object
       properties:
@@ -263,6 +374,28 @@ components:
               example: 102
             message:
               example: item_not_found
+    InvalidToken:
+      allOf:
+        - $ref: '#/components/schemas/ErrorMessage'
+        - type: object
+          properties:
+            code:
+              example: 401
+            errorCode:
+              example: 105
+            message:
+              example: invalid_token
+    InvalidOperationForStatus:
+      allOf:
+        - $ref: '#/components/schemas/ErrorMessage'
+        - type: object
+          properties:
+            code:
+              example: 422
+            errorCode:
+              example: 112
+            message:
+              example: invalid_operation_for_status
   securitySchemes:
     BearerAuth:
       type: http
