@@ -172,7 +172,7 @@ paths:
     get:
       tags:
       - experiment
-      summary: Controller devices uses this endpoint to create websocket connection. Will not return until connection is closed
+      summary: Controller devices use this endpoint to create websocket connection. Will not return until connection is closed
       operationId: experimentWs
       parameters:
         - in: query
@@ -201,9 +201,195 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ItemNotFound'
+  /experiment/job/{id}/output:
+    post:
+      tags:
+      - experiment
+      summary: Controller devices use this endpoint to upload output of a job
+      operationId: storeJobOutput
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the job
+        - in: query
+          name: token
+          schema:
+            type: string
+          required: true
+          description: Token to authorize controller
+      requestBody:
+        description: Output of job in binary format
+        content:
+          octet/stream:
+            schema:
+              type: string
+              example: binary
+              format: binary
+      responses:
+        200:
+          description: Successful upload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        401:
+          description: Invalid token provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidToken'
+        404:
+          description: Unknown controller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemNotFound'
+        500:
+          description: An error occurred while performing IO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IOError'
+  /experiment/controllers:
+    get:
+      tags:
+      - experiment
+      summary: Returns all controllers
+      operationId: fetchControllers
+      responses:
+        200:
+          description: All controllers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                    $ref: '#/components/schemas/SlimController'
+  /experiment/controller/{id}:
+    get:
+      tags:
+      - experiment
+      summary: Returns controller
+      operationId: fetchController
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: id of controller
+      responses:
+        200:
+          description: Controller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlimController'
+        404:
+          description: Unknown controller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemNotFound'
+  /experiment/experiments:
+    get:
+      tags:
+      - experiment
+      summary: Returns all experiments belongs to the authorized user
+      operationId: fetchExperiments
+      responses:
+        200:
+          description: All experiments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SlimExperiment'
+  /experiment/experiment/{id}:
+    get:
+      tags:
+      - experiment
+      summary: Returns experiment belongs to the user. If experiment with given id does not belong to the authorized user, not found error will be returned
+      operationId: fetchExperiment
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: id of experiment
+      responses:
+        200:
+          description: Details of experiment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Experiment'
+        404:
+          description: Experiment not found or not belong to authorized user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemNotFound'
+  /experiment/experiment/{id}/jobs:
+    get:
+      tags:
+      - experiment
+      summary: Returns tuples of job and controller belong to given experiment id as paginated
+      operationId: fetchJobs
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: id of experiment
+        - in: query
+          name: perPage
+          schema:
+            type: integer
+          required: false
+          description: number of items in one page
+        - in: query
+          name: page
+          schema:
+            type: integer
+          description: current page
+      responses:
+        200:
+          description: Tuples of job and controller belong to the given experiment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlimJobSlimControllerPagination'
+        404:
+          description: Experiment not found or not belong to authorized user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemNotFound'
 
 components:
   schemas:
+    Pagination:
+      type: object
+      properties:
+        perPage:
+          type: integer
+          description: number of items in one page
+        currentPage:
+          type: integer
+        totalPages:
+          type: integer
+        total_items:
+          type: integer
+        items:
+          type: array
+          items: {}
     LoginRequest:
       type: object
       properties:
@@ -282,6 +468,81 @@ components:
         message:
           type: string
           example: success
+    SlimController:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: controller-1
+        createdAt:
+          type: string
+          format: date-time
+    SlimExperiment:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        name:
+          type: string
+          example: My experiment
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Experiment:
+      allOf:
+        - $ref: '#/components/schemas/SlimExperiment'
+        - type: object
+          properties:
+            code:
+              type: string
+              format: html-encoded
+              example: print('my python code')
+    JobStatus:
+      type: string
+      enum:
+        - Pending
+        - Running
+        - Successful
+        - Failed
+    SlimJob:
+      type: object
+      properties:
+        id:
+          type: integer
+        experimentId:
+          type: integer
+        controllerId:
+          type: integer
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    SlimJobSlimControllerPagination:
+      allOf:
+        - $ref: '#/components/schemas/Pagination'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: array
+                items:
+                  oneOf:
+                    - $ref: '#/components/schemas/SlimJob'
+                    - $ref: '#/components/schemas/SlimController'
+                minLength: 2
+                maxLength: 2
     ErrorMessage:
       type: object
       properties:
@@ -396,6 +657,17 @@ components:
               example: 112
             message:
               example: invalid_operation_for_status
+    IOError:
+      allOf:
+        - $ref: '#/components/schemas/ErrorMessage'
+        - type: object
+          properties:
+            code:
+              example: 500
+            errorCode:
+              example: 116
+            message:
+              example: io_error
   securitySchemes:
     BearerAuth:
       type: http
