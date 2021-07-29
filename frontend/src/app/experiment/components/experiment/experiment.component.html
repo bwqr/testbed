@@ -10,10 +10,10 @@
     </button>
     <form class="d-flex align-items-center flex-grow-1 justify-content-end"
           (ngSubmit)="runExperiment(formGroup.value)" [formGroup]="formGroup">
-      <select class="form-select form-select-sm" style="max-width: 300px" formControlName="runnerId"
-              id="runner-id">
-        <option value="" disabled selected hidden>Select a runner</option>
-        <option *ngFor="let runner of runners" [ngValue]="runner.id">{{runner.name}}</option>
+      <select class="form-select form-select-sm" style="max-width: 300px" formControlName="controllerId"
+              id="controller-id">
+        <option value="" disabled selected hidden>Select a controller</option>
+        <option *ngFor="let controller of controllers" [ngValue]="controller.id">{{controller.name}}</option>
       </select>
 
       <button class="btn btn-primary mx-2" type="submit" [disabled]="!formGroup.valid || isInProcessingState">
@@ -36,18 +36,18 @@
           <thead>
           <tr>
             <th>Id</th>
-            <th>Runner</th>
+            <th>Controller</th>
             <th>Status</th>
             <th></th>
           </tr>
           </thead>
           <tbody>
-          <tr *ngFor="let jobRunner of jobs.items">
-            <td><small>{{jobRunner[0].id}}</small></td>
-            <td><small>{{jobRunner[1].name}}</small></td>
-            <td><small>{{jobRunner[0].status}}</small></td>
+          <tr *ngFor="let jobController of jobs.items">
+            <td><small>{{jobController[0].id}}</small></td>
+            <td><small>{{jobController[1].name}}</small></td>
+            <td><small>{{jobController[0].status}}</small></td>
             <td>
-              <a class="btn btn-outline-dark" [routerLink]="['../../job', jobRunner[0].id]">
+              <a class="btn btn-outline-dark" [routerLink]="['../../job', jobController[0].id]">
                 <small>Details</small>
               </a>
             </td>

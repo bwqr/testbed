@@ -3,7 +3,7 @@ import {MainComponent} from '../../../shared/components/main/main.component';
 import {ExperimentViewModelService} from '../../../experiment/services/experiment-view-model.service';
 import {ActivatedRoute} from '@angular/router';
 import {catchError, switchMap} from 'rxjs/operators';
-import {SlimRunner} from '../../../experiment/models';
+import {SlimController} from '../../../experiment/models';
 import {AdminViewModelService} from '../../services/admin-view-model.service';
 import {interval, Subscription} from 'rxjs';
 import {formats} from '../../../../defs';
@@ -11,13 +11,13 @@ import {line} from 'd3-shape/src/index.js';
 
 @Component({
   selector: 'app-receiver-values',
-  templateUrl: './runner.component.html',
-  styleUrls: ['./runner.component.scss']
+  templateUrl: './controller.component.html',
+  styleUrls: ['./controller.component.scss']
 })
-export class RunnerComponent extends MainComponent implements OnInit, OnDestroy {
+export class ControllerComponent extends MainComponent implements OnInit, OnDestroy {
   private static MAX_BUFFER_LENGTH = 20;
 
-  runner: SlimRunner;
+  controller: SlimController;
 
   receiverValuesSub: Subscription;
 
@@ -26,7 +26,7 @@ export class RunnerComponent extends MainComponent implements OnInit, OnDestroy 
   formats = formats;
 
   get isPageReady(): boolean {
-    return !!this.runner;
+    return !!this.controller;
   }
 
 
@@ -41,17 +41,17 @@ export class RunnerComponent extends MainComponent implements OnInit, OnDestroy 
   ngOnInit(): void {
     this.subs.add(
       this.activatedRoute.params.pipe(
-        switchMap((params) => this.experimentViewModel.runner(params.id)),
+        switchMap((params) => this.experimentViewModel.controller(params.id)),
       )
-        .subscribe(runner => {
-          this.runner = runner;
+        .subscribe(controller => {
+          this.controller = controller;
 
           if (this.receiverValuesSub) {
             this.receiverValuesSub.unsubscribe();
           }
 
           this.receiverValuesSub = interval(2000).pipe(
-            switchMap(_ => this.viewModel.runnerReceiversValues(runner.id)),
+            switchMap(_ => this.viewModel.controllerReceiversValues(controller.id)),
             catchError((_, caught) => caught)
           )
             .subscribe(res => {
@@ -102,7 +102,7 @@ export class RunnerComponent extends MainComponent implements OnInit, OnDestroy 
 
   updateGraphs(values: number[]): void {
     values.forEach((v, i) => {
-      if (this.receiverValues[i].length > RunnerComponent.MAX_BUFFER_LENGTH) {
+      if (this.receiverValues[i].length > ControllerComponent.MAX_BUFFER_LENGTH) {
         this.receiverValues[i].shift();
       }
 

@@ -5,7 +5,7 @@ import {SlotReserveComponent} from './components/slot-reserve/slot-reserve.compo
 
 const routes: Routes = [
   {path: 'slots', component: SlotsComponent},
-  {path: 'slot/:runnerId/reserve', component: SlotReserveComponent}
+  {path: 'slot/:controllerId/reserve', component: SlotReserveComponent}
 ];
 
 @NgModule({

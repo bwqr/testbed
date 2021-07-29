@@ -11,8 +11,8 @@ export const routes = {
     password: user + '/password'
   },
   experiment: {
-    runners: experiment + '/runners',
-    runner: experiment + '/runner',
+    controllers: experiment + '/controllers',
+    controller: experiment + '/controller',
     experiments: experiment + '/experiments',
     experiment: experiment + '/experiment',
     job: experiment + '/job'

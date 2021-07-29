@@ -1,11 +1,11 @@
 import {NgModule} from '@angular/core';
 import {RouterModule, Routes} from '@angular/router';
-import {RunnerComponent} from './components/runner/runner.component';
-import {RunnersComponent} from './components/runners/runners.component';
+import {ControllerComponent} from './components/controller/controller.component';
+import {ControllersComponent} from './components/controllers/controllers.component';
 
 const routes: Routes = [
-  {path: 'runners', component: RunnersComponent},
-  {path: 'runner/:id', component: RunnerComponent}
+  {path: 'controllers', component: ControllersComponent},
+  {path: 'controller/:id', component: ControllerComponent}
 ];
 
 @NgModule({

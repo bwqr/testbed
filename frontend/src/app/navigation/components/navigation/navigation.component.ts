@@ -58,7 +58,7 @@ export class NavigationComponent extends MainComponent implements OnInit {
     this.subs.add(
       this.route.data.subscribe((data: { user: User }) => {
         if (data.user.roleId === Role.Admin) {
-          this.menus = [profile, experiments, runners, slots, settings, logout];
+          this.menus = [profile, experiments, controllers, slots, settings, logout];
         } else {
           this.menus = [profile, experiments, slots, settings, logout];
         }
@@ -106,9 +106,9 @@ const experiments = {
   text: 'Experiments',
 };
 
-const runners = {
-  routerLink: '/admin/runners',
-  text: 'Runners',
+const controllers = {
+  routerLink: '/admin/controllers',
+  text: 'Controllers',
 };
 
 const logout = {

@@ -17,7 +17,7 @@ export class AdminViewModelService extends MainViewModelService {
     super(cacheService, requestService);
   }
 
-  runnerReceiversValues(runnerId: number): Observable<{ values: number[] | null}> {
-    return this.requestService.makeGetRequest(`${routes.experiment.runner}/${runnerId}/values`);
+  controllerReceiversValues(controllerId: number): Observable<{ values: number[] | null}> {
+    return this.requestService.makeGetRequest(`${routes.experiment.controller}/${controllerId}/values`);
   }
 }

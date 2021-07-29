@@ -1,7 +1,7 @@
 export interface Slot {
   id: number;
   userId: number;
-  runnerId: number;
+  controllerId: number;
   startAt: Date;
   endAt: Date;
   createdAt: Date;

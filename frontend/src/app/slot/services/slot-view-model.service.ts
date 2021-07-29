@@ -8,7 +8,7 @@ import {Observable} from 'rxjs';
 import {map} from 'rxjs/operators';
 import {SuccessResponse} from '../../core/models';
 import {convertDateToLocal, convertDateToServerDate} from '../../helpers';
-import {SlimRunner} from '../../experiment/models';
+import {SlimController} from '../../experiment/models';
 
 @Injectable({
   providedIn: 'root'
@@ -31,7 +31,7 @@ export class SlotViewModelService extends MainViewModelService {
     return slot;
   }
 
-  slots(): Observable<[Slot, SlimRunner][]> {
+  slots(): Observable<[Slot, SlimController][]> {
     return this.requestService.makeGetRequest(routes.slot.slots.root).pipe(
       map(slots => slots.map(ss => {
           ss[0] = SlotViewModelService.mapSlot(ss[0]);
@@ -41,16 +41,16 @@ export class SlotViewModelService extends MainViewModelService {
     );
   }
 
-  reservedSlots(startAt: Date, runnerId: number, count: number): Observable<Date[]> {
+  reservedSlots(startAt: Date, controllerId: number, count: number): Observable<Date[]> {
     return this.requestService
-      .makeGetRequest(`${routes.slot.slots.reserved}?startAt=${convertDateToServerDate(startAt)}&count=${count}&runnerId=${runnerId}`)
+      .makeGetRequest(`${routes.slot.slots.reserved}?startAt=${convertDateToServerDate(startAt)}&count=${count}&controllerId=${controllerId}`)
       .pipe(
         map(stringDates => stringDates.map(s => convertDateToLocal(new Date(s))))
       );
   }
 
-  reserveSlot(startAt: Date, runnerId: number): Observable<SuccessResponse> {
-    return this.requestService.makePostRequest(routes.slot.slot, {startAt: convertDateToServerDate(startAt), runnerId});
+  reserveSlot(startAt: Date, controllerId: number): Observable<SuccessResponse> {
+    return this.requestService.makePostRequest(routes.slot.slot, {startAt: convertDateToServerDate(startAt), controllerId});
   }
 
   cancelSlot(id: number): Observable<SuccessResponse> {

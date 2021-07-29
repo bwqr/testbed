@@ -3,7 +3,7 @@ import {MainViewModelService} from '../../core/services/main-view-model.service'
 import {CacheService} from '../../core/services/cache.service';
 import {MainRequestService} from '../../core/services/main-request.service';
 import {Observable} from 'rxjs';
-import {Experiment, Job, SlimJob, SlimRunner} from '../models';
+import {Experiment, Job, SlimJob, SlimController} from '../models';
 import {routes} from '../../routes';
 import {Pagination, PaginationParams, SuccessResponse} from '../../core/models';
 import {HttpParams} from '@angular/common/http';
@@ -22,16 +22,16 @@ export class ExperimentViewModelService extends MainViewModelService {
     super(cacheService, requestService);
   }
 
-  runners(): Observable<SlimRunner[]> {
-    return this.cacheService.get('experiment.runners', this.requestService.makeGetRequest(routes.experiment.runners));
+  controllers(): Observable<SlimController[]> {
+    return this.cacheService.get('experiment.controllers', this.requestService.makeGetRequest(routes.experiment.controllers));
   }
 
-  runner(id: number): Observable<SlimRunner> {
-    return this.cacheService.get(`experiment.runner.${id}`, this.requestService.makeGetRequest(`${routes.experiment.runner}/${id}`));
+  controller(id: number): Observable<SlimController> {
+    return this.cacheService.get(`experiment.controller.${id}`, this.requestService.makeGetRequest(`${routes.experiment.controller}/${id}`));
   }
 
-  runExperiment(experimentId: number, runnerId: number): Observable<Job> {
-    return this.requestService.makePostRequest(`${routes.experiment.experiment}/${experimentId}/run/${runnerId}`, {}).pipe(
+  runExperiment(experimentId: number, controllerId: number): Observable<Job> {
+    return this.requestService.makePostRequest(`${routes.experiment.experiment}/${experimentId}/run/${controllerId}`, {}).pipe(
       map(j => {
         j.createdAt = convertDateToLocal(j.createdAt);
         j.updatedAt = convertDateToLocal(j.updatedAt);
@@ -40,7 +40,7 @@ export class ExperimentViewModelService extends MainViewModelService {
     );
   }
 
-  experimentJobs(experimentId: number, paginationParams?: PaginationParams): Observable<Pagination<[SlimJob, SlimRunner]>> {
+  experimentJobs(experimentId: number, paginationParams?: PaginationParams): Observable<Pagination<[SlimJob, SlimController]>> {
     const params = this.setPaginationParams(new HttpParams(), paginationParams);
 
     return this.requestService.makeGetRequestWithParams(
@@ -49,7 +49,7 @@ export class ExperimentViewModelService extends MainViewModelService {
     );
   }
 
-  job(id: number): Observable<[Job, SlimRunner]> {
+  job(id: number): Observable<[Job, SlimController]> {
     return this.requestService.makeGetRequest(`${routes.experiment.job}/${id}`).pipe(
       map(js => {
         js[0].createdAt = convertDateToLocal(js[0].createdAt);

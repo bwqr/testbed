@@ -18,7 +18,7 @@
       <thead>
       <tr>
         <th>Id</th>
-        <th>Runner</th>
+        <th>Controller</th>
         <th>Status</th>
         <th>Created at</th>
         <th>Last updated at</th>
@@ -27,7 +27,7 @@
       <tbody>
       <tr *ngIf="isPageReady">
         <td>{{job.id}}</td>
-        <td>{{runner.name}}</td>
+        <td>{{controller.name}}</td>
         <td>{{job.status}}</td>
         <td>{{job.createdAt | date : formats.shortDate}}</td>
         <td>{{job.updatedAt | date : formats.shortDate}}</td>

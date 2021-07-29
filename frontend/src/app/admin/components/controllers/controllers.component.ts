@@ -1,22 +1,22 @@
 import {Component, OnInit} from '@angular/core';
 import {ExperimentViewModelService} from '../../../experiment/services/experiment-view-model.service';
 import {MainComponent} from '../../../shared/components/main/main.component';
-import {SlimRunner} from '../../../experiment/models';
+import {SlimController} from '../../../experiment/models';
 import {formats} from '../../../../defs';
 
 @Component({
-  selector: 'app-runners',
-  templateUrl: './runners.component.html',
-  styleUrls: ['./runners.component.scss']
+  selector: 'app-controllers',
+  templateUrl: './controllers.component.html',
+  styleUrls: ['./controllers.component.scss']
 })
-export class RunnersComponent extends MainComponent implements OnInit {
+export class ControllersComponent extends MainComponent implements OnInit {
 
-  runners: SlimRunner[];
+  controllers: SlimController[];
 
   formats = formats;
 
   get isPageReady(): boolean {
-    return !!this.runners;
+    return !!this.controllers;
   }
 
   constructor(
@@ -27,7 +27,7 @@ export class RunnersComponent extends MainComponent implements OnInit {
 
   ngOnInit(): void {
     this.subs.add(
-      this.experimentViewModel.runners().subscribe(runners => this.runners = runners)
+      this.experimentViewModel.controllers().subscribe(controllers => this.controllers = controllers)
     );
   }
 

@@ -1,6 +1,6 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { MainComponent } from '../../../shared/components/main/main.component';
-import { Job, JobStatus, SlimRunner } from '../../models';
+import { Job, JobStatus, SlimController } from '../../models';
 import { ExperimentViewModelService } from '../../services/experiment-view-model.service';
 import { ActivatedRoute } from '@angular/router';
 import { switchMap, finalize, catchError } from 'rxjs/operators';
@@ -25,7 +25,7 @@ export class JobComponent extends MainComponent implements OnInit {
 
     jobStatuses = JobStatus;
 
-    runner: SlimRunner;
+    controller: SlimController;
 
     @ViewChild('code') code: ElementRef;
 
@@ -34,7 +34,7 @@ export class JobComponent extends MainComponent implements OnInit {
     formats = formats;
 
     get isPageReady(): boolean {
-        return !!this.job && !!this.runner;
+        return !!this.job && !!this.controller;
     }
 
     constructor(
@@ -50,10 +50,10 @@ export class JobComponent extends MainComponent implements OnInit {
         this.subs.add(
             this.activatedRoute.params.pipe(
                 switchMap(params => this.viewModel.job(params.id))
-            ).subscribe(([job, runner]) => {
+            ).subscribe(([job, controller]) => {
                 this.job = job;
                 this.outputLink = `${environment.apiEndpoint}/experiment/job/${job.id}/output?token=${this.authService.getToken()}`;
-                this.runner = runner;
+                this.controller = controller;
 
                 // experiment.code is html encoded, we need to decode it
                 const el = document.createElement('textarea');

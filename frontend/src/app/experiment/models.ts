@@ -9,7 +9,7 @@ export interface Experiment {
   updatedAt: Date;
 }
 
-export interface SlimRunner {
+export interface SlimController {
   id: number;
   name: string;
   createdAt: Date;
@@ -18,7 +18,7 @@ export interface SlimRunner {
 export interface SlimJob {
   id: number;
   experimentId: number;
-  runnerId: number;
+  controllerId: number;
   status: JobStatus;
   createdAt: Date;
   updatedAt: Date;

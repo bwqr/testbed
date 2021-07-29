@@ -24,7 +24,7 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
 
   formats = formats;
 
-  runnerId: number;
+  controllerId: number;
 
   filterDate: Date;
   isFilterDateToday: boolean;
@@ -49,7 +49,7 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
     this.subs.add(
       combineLatest([this.activatedRoute.params, this.trigger]).pipe(
         switchMap(([params, _]) => {
-          this.runnerId = parseInt(params.runnerId, 10);
+          this.controllerId = parseInt(params.controllerId, 10);
           const now = new Date();
           const startOfToday = this.startOfDay(now.getTime());
 
@@ -60,10 +60,10 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
             now.setMilliseconds(0);
             now.setSeconds(0);
             now.setMinutes(0);
-            return this.viewModel.reservedSlots(now, this.runnerId, count);
+            return this.viewModel.reservedSlots(now, this.controllerId, count);
           }
 
-          return this.viewModel.reservedSlots(this.filterDate, this.runnerId, 24);
+          return this.viewModel.reservedSlots(this.filterDate, this.controllerId, 24);
         })
       ).subscribe(dates => {
         this.reservedSlots = [];
@@ -96,7 +96,7 @@ export class SlotReserveComponent extends MainComponent implements OnInit {
     this.enterProcessingState();
 
     this.subs.add(
-      this.viewModel.reserveSlot(res.startAt, this.runnerId)
+      this.viewModel.reserveSlot(res.startAt, this.controllerId)
         .pipe(
           finalize(() => this.leaveProcessingState()),
           catchError(errorMessage => {

@@ -2,7 +2,7 @@ import {Component, OnInit} from '@angular/core';
 import {Slot} from '../../models';
 import {SlotViewModelService} from '../../services/slot-view-model.service';
 import {MainComponent} from '../../../shared/components/main/main.component';
-import {SlimRunner} from '../../../experiment/models';
+import {SlimController} from '../../../experiment/models';
 import {ExperimentViewModelService} from '../../../experiment/services/experiment-view-model.service';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
@@ -18,16 +18,16 @@ import {ErrorMessage} from '../../../core/models';
 })
 export class SlotsComponent extends MainComponent implements OnInit {
 
-  slots: [Slot, SlimRunner][];
+  slots: [Slot, SlimController][];
 
-  runners: SlimRunner[];
+  controllers: SlimController[];
 
   formGroup: FormGroup;
 
   formats = formats;
 
   get isPageReady(): boolean {
-    return !!this.slots && !!this.runners;
+    return !!this.slots && !!this.controllers;
   }
 
   constructor(
@@ -41,7 +41,7 @@ export class SlotsComponent extends MainComponent implements OnInit {
     super();
 
     this.formGroup = this.formBuilder.group({
-      runnerId: formBuilder.control('', [Validators.required])
+      controllerId: formBuilder.control('', [Validators.required])
     });
   }
 
@@ -51,12 +51,12 @@ export class SlotsComponent extends MainComponent implements OnInit {
     );
 
     this.subs.add(
-      this.experimentViewModel.runners().subscribe(runners => this.runners = runners)
+      this.experimentViewModel.controllers().subscribe(controllers => this.controllers = controllers)
     );
   }
 
-  redirectToSlotReserve(values: {runnerId: number}): void {
-    this.router.navigate(['../slot', values.runnerId, 'reserve'], {
+  redirectToSlotReserve(values: {controllerId: number}): void {
+    this.router.navigate(['../slot', values.controllerId, 'reserve'], {
       relativeTo: this.activatedRoute
     }).then();
   }

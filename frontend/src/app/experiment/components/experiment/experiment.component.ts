@@ -1,7 +1,7 @@
 import {Component, ElementRef, OnInit, ViewChild} from '@angular/core';
 import {MainComponent} from '../../../shared/components/main/main.component';
 import {ExperimentViewModelService} from '../../services/experiment-view-model.service';
-import {Experiment, JobUpdate, SlimJob, SlimRunner} from '../../models';
+import {Experiment, JobUpdate, SlimJob, SlimController} from '../../models';
 import {ActivatedRoute} from '@angular/router';
 import {catchError, filter, finalize, map, switchMap} from 'rxjs/operators';
 import {MainService} from '../../../core/services/main.service';
@@ -27,9 +27,9 @@ export class ExperimentComponent extends MainComponent implements OnInit {
 
   experiment: Experiment;
 
-  runners: SlimRunner[];
+  controllers: SlimController[];
 
-  jobs: Pagination<[SlimJob, SlimRunner]>;
+  jobs: Pagination<[SlimJob, SlimController]>;
 
   @ViewChild('code') code: ElementRef;
 
@@ -38,7 +38,7 @@ export class ExperimentComponent extends MainComponent implements OnInit {
   formGroup: FormGroup;
 
   get isPageReady(): boolean {
-    return !!this.experiment && !!this.runners && !!this.jobs;
+    return !!this.experiment && !!this.controllers && !!this.jobs;
   }
 
   constructor(
@@ -51,7 +51,7 @@ export class ExperimentComponent extends MainComponent implements OnInit {
     super();
 
     this.formGroup = this.formBuilder.group({
-      runnerId: formBuilder.control('', [Validators.required]),
+      controllerId: formBuilder.control('', [Validators.required]),
     });
 
     this.subs.add(this.webSocketService.listenNotifications().pipe(
@@ -68,7 +68,7 @@ export class ExperimentComponent extends MainComponent implements OnInit {
 
   ngOnInit(): void {
     this.subs.add(
-      this.viewModel.runners().subscribe(runners => this.runners = runners)
+      this.viewModel.controllers().subscribe(controllers => this.controllers = controllers)
     );
 
     this.subs.add(
@@ -141,12 +141,12 @@ export class ExperimentComponent extends MainComponent implements OnInit {
     );
   }
 
-  runExperiment(value: { runnerId: number }): void {
+  runExperiment(value: { controllerId: number }): void {
     this.enterProcessingState();
-    const runner = this.runners.find(r => r.id === value.runnerId);
+    const controller = this.controllers.find(r => r.id === value.controllerId);
 
     this.subs.add(
-      this.viewModel.runExperiment(this.experiment.id, value.runnerId).pipe(
+      this.viewModel.runExperiment(this.experiment.id, value.controllerId).pipe(
         finalize(() => this.leaveProcessingState()),
         catchError(error => {
           if (error instanceof ErrorMessage) {
@@ -157,9 +157,9 @@ export class ExperimentComponent extends MainComponent implements OnInit {
         })
       )
         .subscribe(job => {
-          this.jobs.items.unshift([job, runner]);
+          this.jobs.items.unshift([job, controller]);
           this.service.alertSuccess('Experiment is queued to run');
-          this.formGroup.reset({runnerId: ''});
+          this.formGroup.reset({controllerId: ''});
         })
     );
   }

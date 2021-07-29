@@ -1,15 +1,15 @@
 <div class="container mt-4">
   <div class="mb-4">
-    <p class="fs-3">Runner - {{ runner ? runner.name : ''}}</p>
+    <p class="fs-3">Controller - {{ controller ? controller.name : ''}}</p>
     <hr>
   </div>
 
   <div class="bg-white rounded-3 shadow-sm p-md-5 p-3">
     <div class="row">
       <div class="col-md-4" *ngIf="isPageReady">
-        <p>{{runner.id}}</p>
-        <p>{{runner.name}}</p>
-        <p>{{runner.createdAt | date: formats.longDate}}</p>
+        <p>{{controller.id}}</p>
+        <p>{{controller.name}}</p>
+        <p>{{controller.createdAt | date: formats.longDate}}</p>
       </div>
       <div class="col-md-8" id="svg-container">
       </div>

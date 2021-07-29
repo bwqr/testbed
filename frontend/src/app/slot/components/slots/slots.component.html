@@ -8,14 +8,14 @@
     <div class="d-flex justify-content-end mb-4">
       <form class="d-flex align-items-center flex-grow-1 justify-content-end"
             (ngSubmit)="redirectToSlotReserve(formGroup.value)" [formGroup]="formGroup">
-        <select class="form-select form-select-sm" style="max-width: 300px" formControlName="runnerId"
-                id="runner-id">
-          <option value="" disabled selected hidden>Select a runner</option>
-          <option *ngFor="let runner of runners" [ngValue]="runner.id">{{runner.name}}</option>
+        <select class="form-select form-select-sm" style="max-width: 300px" formControlName="controllerId"
+                id="controller-id">
+          <option value="" disabled selected hidden>Select a controller</option>
+          <option *ngFor="let controller of controllers" [ngValue]="controller.id">{{controller.name}}</option>
         </select>
 
         <button class="btn btn-primary mx-2" type="submit" [disabled]="!formGroup.valid">
-          Reserve Slots for Runner
+          Reserve Slots for Controller
         </button>
       </form>
     </div>
@@ -25,7 +25,7 @@
         <thead>
         <tr>
           <th>Id</th>
-          <th>Runner</th>
+          <th>Controller</th>
           <th>Start at</th>
           <th>End at</th>
           <th>Created at</th>
