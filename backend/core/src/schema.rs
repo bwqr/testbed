@@ -1,4 +1,13 @@
 table! {
+    controllers (id) {
+        id -> Int4,
+        name -> Varchar,
+        access_key -> Varchar,
+        created_at -> Timestamp,
+    }
+}
+
+table! {
     experiments (id) {
         id -> Int4,
         user_id -> Int4,
@@ -13,7 +22,7 @@ table! {
     jobs (id) {
         id -> Int4,
         experiment_id -> Int4,
-        runner_id -> Int4,
+        controller_id -> Int4,
         code -> Text,
         status -> Varchar,
         created_at -> Timestamp,
@@ -29,19 +38,10 @@ table! {
 }
 
 table! {
-    runners (id) {
-        id -> Int4,
-        name -> Varchar,
-        access_key -> Varchar,
-        created_at -> Timestamp,
-    }
-}
-
-table! {
     slots (id) {
         id -> Int4,
         user_id -> Int4,
-        runner_id -> Int4,
+        controller_id -> Int4,
         start_at -> Timestamp,
         end_at -> Timestamp,
         created_at -> Timestamp,
@@ -62,17 +62,17 @@ table! {
 }
 
 joinable!(experiments -> users (user_id));
+joinable!(jobs -> controllers (controller_id));
 joinable!(jobs -> experiments (experiment_id));
-joinable!(jobs -> runners (runner_id));
-joinable!(slots -> runners (runner_id));
+joinable!(slots -> controllers (controller_id));
 joinable!(slots -> users (user_id));
 joinable!(users -> roles (role_id));
 
 allow_tables_to_appear_in_same_query!(
+    controllers,
     experiments,
     jobs,
     roles,
-    runners,
     slots,
     users,
 );

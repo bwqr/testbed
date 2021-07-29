@@ -3,26 +3,26 @@ use actix_web_actors::ws::{Message, ProtocolError, WebsocketContext};
 use log::{error, info};
 
 use core::types::ModelId;
-use shared::RunnerState;
+use shared::ControllerState;
 use shared::SocketErrorKind;
 use shared::websocket_messages::{client, server};
 
-use crate::connection::messages::{DisconnectServerMessage, JoinServerMessage, RunMessage, RunResultMessage, UpdateRunnerValue, AbortRunningJob};
+use crate::connection::messages::{DisconnectServerMessage, JoinServerMessage, RunMessage, RunResultMessage, UpdateControllerValue, AbortRunningJob};
 use crate::connection::server::ExperimentServer;
 
 pub struct Session {
     experiment_server: Addr<ExperimentServer>,
-    // this is used for joining into Experiment Server, after that point, it does not reflect runner state
-    initial_runner_state: RunnerState,
-    runner_id: ModelId,
+    // this is used for joining into Experiment Server, after that point, it does not reflect controller state
+    initial_controller_state: ControllerState,
+    controller_id: ModelId,
 }
 
 impl Session {
-    pub fn new(experiment_server: Addr<ExperimentServer>, runner_id: ModelId, initial_runner_state: RunnerState) -> Self {
+    pub fn new(experiment_server: Addr<ExperimentServer>, controller_id: ModelId, initial_controller_state: ControllerState) -> Self {
         Session {
             experiment_server,
-            initial_runner_state,
-            runner_id,
+            initial_controller_state,
+            controller_id,
         }
     }
 
@@ -41,13 +41,13 @@ impl Session {
                         let run_result = serde_json::from_str::<'_, server::SocketMessage<server::RunResult>>(text)
                             .map_err(|_| SocketErrorKind::InvalidMessage)?;
 
-                        info!("received run result from runner, successful {}", run_result.data.successful);
+                        info!("received run result from controller, successful {}", run_result.data.successful);
 
                         let exp_addr = self.experiment_server.clone();
 
                         let msg = RunResultMessage {
                             job_id: run_result.data.job_id,
-                            runner_id: self.runner_id,
+                            controller_id: self.controller_id,
                             successful: run_result.data.successful,
                         };
 
@@ -61,13 +61,13 @@ impl Session {
                             .spawn(ctx);
                     }
                     server::SocketMessageKind::ReceiverStatus => {
-                        let receiver_value = serde_json::from_str::<'_, server::SocketMessage<server::RunnerReceiverValue>>(text)
+                        let receiver_value = serde_json::from_str::<'_, server::SocketMessage<server::ControllerReceiverValue>>(text)
                             .map_err(|_| SocketErrorKind::InvalidMessage)?;
 
                         let exp_addr = self.experiment_server.clone();
 
-                        let msg = UpdateRunnerValue {
-                            runner_id: self.runner_id,
+                        let msg = UpdateControllerValue {
+                            controller_id: self.controller_id,
                             values: receiver_value.data.values,
                         };
 
@@ -97,8 +97,8 @@ impl Actor for Session {
         let exp_addr = self.experiment_server.clone();
 
         let msg = JoinServerMessage {
-            state: self.initial_runner_state.clone(),
-            runner_id: self.runner_id,
+            state: self.initial_controller_state.clone(),
+            controller_id: self.controller_id,
             addr: ctx.address(),
         };
 
@@ -114,7 +114,7 @@ impl Actor for Session {
 
     fn stopped(&mut self, _: &mut Self::Context) {
         self.experiment_server.do_send(DisconnectServerMessage {
-            runner_id: self.runner_id
+            controller_id: self.controller_id
         });
     }
 }

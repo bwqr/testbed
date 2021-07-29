@@ -10,7 +10,7 @@ use serial::core::SerialDevice;
 
 use crate::connection::Connection;
 use crate::executor::limits::{MAX_CPU_CORE, MAX_MEMORY_USAGE};
-use crate::messages::{RunMessage, RunnerReceiversValueMessage, RunResultMessage, IsJobAborted};
+use crate::messages::{RunMessage, ControllerReceiversValueMessage, RunResultMessage, IsJobAborted};
 use crate::ModelId;
 use crate::state::{Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, State};
 
@@ -360,7 +360,7 @@ impl Executor {
                 }
             }
 
-            act.connection.do_send(RunnerReceiversValueMessage { values });
+            act.connection.do_send(ControllerReceiversValueMessage { values });
 
             ctx.run_later(Duration::from_secs(SEND_RECEIVERS_VALUES_INTERVAL), Self::send_receivers_values);
         }

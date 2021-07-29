@@ -5,7 +5,7 @@ drop table slots;
 drop trigger jobs_updated_at on jobs;
 drop table jobs;
 
-drop table runners;
+drop table controllers;
 
 drop trigger experiments_updated_at on experiments;
 drop table experiments;

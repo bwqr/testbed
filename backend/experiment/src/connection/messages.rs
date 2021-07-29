@@ -1,7 +1,7 @@
 use actix::{Addr, Message};
 
 use core::types::ModelId;
-use shared::RunnerState;
+use shared::ControllerState;
 
 use crate::connection::session::Session;
 
@@ -15,34 +15,34 @@ pub struct RunMessage {
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct JoinServerMessage {
-    pub state: RunnerState,
-    pub runner_id: ModelId,
+    pub state: ControllerState,
+    pub controller_id: ModelId,
     pub addr: Addr<Session>,
 }
 
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct DisconnectServerMessage {
-    pub runner_id: ModelId,
+    pub controller_id: ModelId,
 }
 
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct RunResultMessage {
-    pub runner_id: ModelId,
+    pub controller_id: ModelId,
     pub job_id: ModelId,
     pub successful: bool,
 }
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct UpdateRunnerValue {
-    pub runner_id: ModelId,
+pub struct UpdateControllerValue {
+    pub controller_id: ModelId,
     pub values: Vec<u8>,
 }
 
 pub struct ReceiverValues {
-    pub runner_id: ModelId,
+    pub controller_id: ModelId,
 }
 
 impl Message for ReceiverValues {
@@ -53,6 +53,6 @@ impl Message for ReceiverValues {
 #[rtype(result = "()")]
 pub struct AbortRunningJob {
     pub job_id: ModelId,
-    pub runner_id: ModelId,
+    pub controller_id: ModelId,
 }
 

@@ -52,7 +52,7 @@ create trigger experiments_updated_at
     for each row
 execute procedure update_timestamp();
 
-create table runners
+create table controllers
 (
     id         serial PRIMARY KEY  NOT NULL,
     name       varchar(256)        NOT NULL,
@@ -64,13 +64,13 @@ create table jobs
 (
     id            serial PRIMARY KEY NOT NULL,
     experiment_id integer            NOT NULL,
-    runner_id     integer            NOT NULL,
+    controller_id     integer            NOT NULL,
     code          text               NOT NULL,
     status        varchar(11)        NOT NULL DEFAULT 'Pending' CHECK ( status in ('Pending', 'Running', 'Successful', 'Failed') ),
     created_at    timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT job_experiment_id FOREIGN KEY (experiment_id) REFERENCES experiments (id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    CONSTRAINT job_runner_id FOREIGN KEY (runner_id) REFERENCES runners (id) ON DELETE NO ACTION ON UPDATE NO ACTION
+    CONSTRAINT job_controller_id FOREIGN KEY (controller_id) REFERENCES controllers (id) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 create trigger jobs_updated_at
@@ -79,8 +79,8 @@ create trigger jobs_updated_at
     for each row
 execute procedure update_timestamp();
 
-insert into runners (name, access_key)
-values ('NanoNetworking Testbed', 'runner_1');
+insert into controllers (name, access_key)
+values ('NanoNetworking Testbed', 'controller_1');
 
 INSERT INTO public.experiments (user_id, name, code, created_at, updated_at)
 VALUES (1, 'transmitter crash', 'import sys
@@ -249,13 +249,13 @@ create table slots
 (
     id         serial PRIMARY KEY NOT NULL,
     user_id    integer            NOT NULL,
-    runner_id  integer            NOT NULL,
+    controller_id  integer            NOT NULL,
     start_at   timestamp          NOT NULL,
     end_at     timestamp          NOT NULL,
     created_at timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp          NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT slot_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    CONSTRAINT slot_runner_id FOREIGN KEY (runner_id) REFERENCES runners (id) ON DELETE NO ACTION ON UPDATE NO ACTION
+    CONSTRAINT slot_controller_id FOREIGN KEY (controller_id) REFERENCES controllers (id) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 create trigger slots_updated_at

@@ -6,7 +6,7 @@ use core::types::ModelId;
 #[serde(rename_all = "camelCase")]
 pub struct ReservedQueryRequest {
     pub start_at: NaiveDateTime,
-    pub runner_id: ModelId,
+    pub controller_id: ModelId,
     pub count: u32,
 }
 
@@ -14,5 +14,5 @@ pub struct ReservedQueryRequest {
 #[serde(rename_all = "camelCase")]
 pub struct SlotReserveRequest {
     pub start_at: NaiveDateTime,
-    pub runner_id: ModelId,
+    pub controller_id: ModelId,
 }

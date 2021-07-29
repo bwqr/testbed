@@ -20,8 +20,8 @@ pub fn register(config: &mut web::ServiceConfig) {
                 .service(
                     web::scope("")
                         .wrap(Auth)
-                        .service(handlers::fetch_runners)
-                        .service(handlers::fetch_runner)
+                        .service(handlers::fetch_controllers)
+                        .service(handlers::fetch_controller)
                         .service(handlers::fetch_experiments)
                         .service(handlers::fetch_experiment)
                         .service(handlers::fetch_experiment_jobs)
@@ -36,7 +36,7 @@ pub fn register(config: &mut web::ServiceConfig) {
                         .service(
                             web::scope("")
                                 .wrap(AdminUser)
-                                .service(handlers::runner_receiver_values)
+                                .service(handlers::controller_receiver_values)
                         )
                 )
         );
@@ -44,7 +44,7 @@ pub fn register(config: &mut web::ServiceConfig) {
 
 #[derive(Debug)]
 pub enum ErrorMessage {
-    UnknownRunner,
+    UnknownController,
     NotAllowedToRunForSlot,
     OutputAlreadyExist,
 }
@@ -52,10 +52,10 @@ pub enum ErrorMessage {
 impl ErrorMessaging for ErrorMessage {
     fn value(&self) -> HttpError {
         match self {
-            ErrorMessage::UnknownRunner => HttpError {
+            ErrorMessage::UnknownController => HttpError {
                 code: StatusCode::NOT_FOUND,
                 error_code: 100,
-                message: String::from("unknown_runner"),
+                message: String::from("unknown_controller"),
             },
             ErrorMessage::NotAllowedToRunForSlot => HttpError {
                 code: StatusCode::FORBIDDEN,

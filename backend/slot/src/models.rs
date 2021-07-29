@@ -10,7 +10,7 @@ use core::types::ModelId;
 pub struct Slot {
     pub id: ModelId,
     pub user_id: ModelId,
-    pub runner_id: ModelId,
+    pub controller_id: ModelId,
     pub start_at: NaiveDateTime,
     pub end_at: NaiveDateTime,
     pub created_at: NaiveDateTime,

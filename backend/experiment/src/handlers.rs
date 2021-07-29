@@ -11,11 +11,11 @@ use core::error::ErrorMessaging;
 use core::models::paginate::{CountStarOver, Paginate, Pagination, PaginationRequest};
 use core::responses::SuccessResponse;
 use core::sanitized::SanitizedJson;
-use core::schema::{experiments, jobs, runners, slots};
+use core::schema::{experiments, jobs, controllers, slots};
 use core::types::{DBPool, DefaultResponse, ModelId, Result};
 use core::utils::Hash;
 use core::ErrorMessage as CoreErrorMessage;
-use shared::{JoinServerRequest, RunnerState};
+use shared::{JoinServerRequest, ControllerState};
 use user::models::user::User;
 
 use crate::connection::server::{ExperimentServer, RunExperiment, AbortRunningJob};
@@ -23,7 +23,7 @@ use crate::connection::session::Session;
 use crate::connection::ReceiverValues;
 use crate::models::experiment::{Experiment, SlimExperiment, SLIM_EXPERIMENT_COLUMNS};
 use crate::models::job::{Job, JobStatus, SlimJob, SLIM_JOB_COLUMNS};
-use crate::models::runner::{Runner, RunnerToken, SlimRunner, SLIM_RUNNER_COLUMNS};
+use crate::models::controller::{Controller, ControllerToken, SlimController, SLIM_CONTROLLER_COLUMNS};
 use crate::requests::{ExperimentCodeRequest, ExperimentNameRequest};
 use crate::ErrorMessage;
 
@@ -43,27 +43,27 @@ pub async fn join_server(
     let join_server_request = join_server_request.into_inner();
 
     let token = hash
-        .decode::<RunnerToken>(join_server_request.token.as_str())
+        .decode::<ControllerToken>(join_server_request.token.as_str())
         .map_err(|_| CoreErrorMessage::InvalidToken)?;
 
-    let runner = web::block(move || {
-        runners::table
-            .filter(runners::access_key.eq(token.access_key))
-            .first::<Runner>(&conn)
+    let controller = web::block(move || {
+        controllers::table
+            .filter(controllers::access_key.eq(token.access_key))
+            .first::<Controller>(&conn)
     })
     .await?;
 
-    let runner_state = if let Some(job_id) = join_server_request.running_job_id {
-        RunnerState::Running(job_id)
+    let controller_state = if let Some(job_id) = join_server_request.running_job_id {
+        ControllerState::Running(job_id)
     } else {
-        RunnerState::Idle
+        ControllerState::Idle
     };
 
     ws::start(
         Session::new(
             experiment_server.get_ref().clone(),
-            runner.id,
-            runner_state,
+            controller.id,
+            controller_state,
         ),
         &req,
         stream,
@@ -71,52 +71,52 @@ pub async fn join_server(
     .map_err(|_| Box::new(CoreErrorMessage::WebSocketConnectionError) as Box<dyn ErrorMessaging>)
 }
 
-#[get("runners")]
-pub async fn fetch_runners(pool: web::Data<DBPool>) -> Result<Json<Vec<SlimRunner>>> {
+#[get("controllers")]
+pub async fn fetch_controllers(pool: web::Data<DBPool>) -> Result<Json<Vec<SlimController>>> {
     let conn = pool.get().unwrap();
 
-    let runners = web::block(move || {
-        runners::table
-            .select(SLIM_RUNNER_COLUMNS)
-            .load::<SlimRunner>(&conn)
+    let controllers = web::block(move || {
+        controllers::table
+            .select(SLIM_CONTROLLER_COLUMNS)
+            .load::<SlimController>(&conn)
     })
     .await?;
 
-    Ok(Json(runners))
+    Ok(Json(controllers))
 }
 
-#[get("runner/{id}")]
-pub async fn fetch_runner(
+#[get("controller/{id}")]
+pub async fn fetch_controller(
     pool: web::Data<DBPool>,
-    runner_id: web::Path<ModelId>,
-) -> Result<Json<SlimRunner>> {
+    controller_id: web::Path<ModelId>,
+) -> Result<Json<SlimController>> {
     let conn = pool.get().unwrap();
 
-    let runner = web::block(move || {
-        runners::table
-            .find(runner_id.into_inner())
-            .select(SLIM_RUNNER_COLUMNS)
-            .first::<SlimRunner>(&conn)
+    let controller = web::block(move || {
+        controllers::table
+            .find(controller_id.into_inner())
+            .select(SLIM_CONTROLLER_COLUMNS)
+            .first::<SlimController>(&conn)
     })
     .await?;
 
-    Ok(Json(runner))
+    Ok(Json(controller))
 }
 
-#[get("runner/{id}/values")]
-pub async fn runner_receiver_values(
+#[get("controller/{id}/values")]
+pub async fn controller_receiver_values(
     experiment_server: web::Data<Addr<ExperimentServer>>,
-    runner_id: web::Path<ModelId>,
+    controller_id: web::Path<ModelId>,
 ) -> DefaultResponse {
     let values = experiment_server
         .send(ReceiverValues {
-            runner_id: runner_id.into_inner(),
+            controller_id: controller_id.into_inner(),
         })
         .await
         .map_err(|_| {
             CoreErrorMessage::Custom("failed to receive receiver status from experiment server")
         })?
-        .map_err(|_| ErrorMessage::UnknownRunner)?;
+        .map_err(|_| ErrorMessage::UnknownController)?;
 
     Ok(HttpResponse::Ok().json(json!({ "values": values })))
 }
@@ -168,7 +168,7 @@ pub async fn fetch_experiment_jobs(
     experiment_id: web::Path<ModelId>,
     user: User,
     pagination: web::Query<PaginationRequest>,
-) -> Result<Json<Pagination<(SlimJob, SlimRunner)>>> {
+) -> Result<Json<Pagination<(SlimJob, SlimController)>>> {
     let conn = pool.get().unwrap();
 
     let jobs = web::block(move || {
@@ -179,12 +179,12 @@ pub async fn fetch_experiment_jobs(
 
         jobs::table
             .filter(jobs::experiment_id.eq(experiment.id))
-            .inner_join(runners::table)
+            .inner_join(controllers::table)
             .order_by(jobs::id.desc())
-            .select(((SLIM_JOB_COLUMNS, SLIM_RUNNER_COLUMNS), CountStarOver))
+            .select(((SLIM_JOB_COLUMNS, SLIM_CONTROLLER_COLUMNS), CountStarOver))
             .paginate(pagination.page)
             .per_page(pagination.per_page)
-            .load_and_count_pages::<(SlimJob, SlimRunner)>(&conn)
+            .load_and_count_pages::<(SlimJob, SlimController)>(&conn)
     })
     .await?;
 
@@ -196,17 +196,17 @@ pub async fn fetch_job(
     pool: web::Data<DBPool>,
     job_id: web::Path<ModelId>,
     user: User,
-) -> Result<Json<(Job, SlimRunner)>> {
+) -> Result<Json<(Job, SlimController)>> {
     let conn = pool.get().unwrap();
 
     let job = web::block(move || {
         jobs::table
             .filter(jobs::id.eq(job_id.into_inner()))
-            .inner_join(runners::table)
+            .inner_join(controllers::table)
             .inner_join(experiments::table)
             .filter(experiments::user_id.eq(user.id))
-            .select((jobs::all_columns, SLIM_RUNNER_COLUMNS))
-            .first::<(Job, SlimRunner)>(&conn)
+            .select((jobs::all_columns, SLIM_CONTROLLER_COLUMNS))
+            .first::<(Job, SlimController)>(&conn)
     })
     .await?;
 
@@ -233,7 +233,7 @@ pub async fn abort_running_job(
                 .first::<Job>(&conn)?;
 
             match job.status {
-                JobStatus::Running => Ok(Some((job.id, job.runner_id))),
+                JobStatus::Running => Ok(Some((job.id, job.controller_id))),
                 JobStatus::Pending => {
                     diesel::update(&job)
                         .set(jobs::status.eq(JobStatus::Failed.value()))
@@ -248,8 +248,8 @@ pub async fn abort_running_job(
     })
     .await?;
 
-    if let Some((job_id, runner_id)) = option {
-        experiment_server.send(AbortRunningJob {job_id, runner_id})
+    if let Some((job_id, controller_id)) = option {
+        experiment_server.send(AbortRunningJob {job_id, controller_id})
             .await
             .map_err(|_| CoreErrorMessage::Custom("Failed to send AbortRunningJob message to experiment server"))?;
     }
@@ -304,7 +304,7 @@ pub async fn update_experiment_name(
     Ok(Json(SuccessResponse::default()))
 }
 
-#[post("experiment/{experiment_id}/run/{runner_id}")]
+#[post("experiment/{experiment_id}/run/{controller_id}")]
 pub async fn run_experiment(
     pool: web::Data<DBPool>,
     experiment_server: web::Data<Addr<ExperimentServer>>,
@@ -312,7 +312,7 @@ pub async fn run_experiment(
     user: User,
 ) -> Result<Json<Job>> {
     let conn = pool.get().unwrap();
-    let (experiment_id, runner_id) = ids.into_inner();
+    let (experiment_id, controller_id) = ids.into_inner();
     let user_id = user.id;
 
     let mut job = web::block(move || -> Result<Job> {
@@ -321,7 +321,7 @@ pub async fn run_experiment(
             .find(experiment_id)
             .first::<Experiment>(&conn)?;
 
-        let runner = runners::table.find(runner_id).first::<Runner>(&conn)?;
+        let controller = controllers::table.find(controller_id).first::<Controller>(&conn)?;
 
         let now = Utc::now().naive_utc();
 
@@ -331,7 +331,7 @@ pub async fn run_experiment(
                 .filter(
                     slots::user_id
                         .eq(user.id)
-                        .and(slots::runner_id.eq(runner.id)),
+                        .and(slots::controller_id.eq(controller.id)),
                 ),
         ))
         .get_result(&conn)?;
@@ -343,7 +343,7 @@ pub async fn run_experiment(
         diesel::insert_into(jobs::table)
             .values((
                 jobs::experiment_id.eq(experiment.id),
-                jobs::runner_id.eq(runner.id),
+                jobs::controller_id.eq(controller.id),
                 jobs::code.eq(experiment.code),
             ))
             .get_result::<Job>(&conn)
@@ -357,7 +357,7 @@ pub async fn run_experiment(
         .send(RunExperiment {
             code: job.code.clone(),
             job_id,
-            runner_id,
+            controller_id,
             user_id,
         })
         .await

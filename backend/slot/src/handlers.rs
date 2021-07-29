@@ -5,9 +5,9 @@ use diesel::prelude::*;
 use core::error::ErrorMessaging;
 use core::ErrorMessage as CoreErrorMessage;
 use core::responses::SuccessResponse;
-use core::schema::{runners, slots};
+use core::schema::{controllers, slots};
 use core::types::{DBPool, ModelId, Result};
-use experiment::models::runner::{SLIM_RUNNER_COLUMNS, SlimRunner};
+use experiment::models::controller::{SLIM_CONTROLLER_COLUMNS, SlimController};
 use user::models::user::User;
 
 use crate::ErrorMessage;
@@ -20,7 +20,7 @@ const SLOT_IDLE_TIME: i64 = 60 * 10;
 
 /// returns all slots belonging to a user and not ended yet
 #[get("slots")]
-pub async fn fetch_slots(pool: web::Data<DBPool>, user: User) -> Result<Json<Vec<(Slot, SlimRunner)>>> {
+pub async fn fetch_slots(pool: web::Data<DBPool>, user: User) -> Result<Json<Vec<(Slot, SlimController)>>> {
     let conn = pool.get().unwrap();
     let now = Utc::now().naive_utc();
 
@@ -28,9 +28,9 @@ pub async fn fetch_slots(pool: web::Data<DBPool>, user: User) -> Result<Json<Vec
         slots::table
             .filter(slots::end_at.gt(now))
             .filter(slots::user_id.eq(user.id))
-            .inner_join(runners::table)
-            .select((slots::all_columns, SLIM_RUNNER_COLUMNS))
-            .load::<(Slot, SlimRunner)>(&conn)
+            .inner_join(controllers::table)
+            .select((slots::all_columns, SLIM_CONTROLLER_COLUMNS))
+            .load::<(Slot, SlimController)>(&conn)
     )
         .await?;
 
@@ -67,7 +67,7 @@ pub async fn fetch_resolved_slots(pool: web::Data<DBPool>, query: web::Query<Res
     let reserved_slots_start_ats = web::block(move ||
         slots::table
             .filter(slots::start_at.ge(start_at_beginning).and(slots::start_at.lt(start_at_ending)))
-            .filter(slots::runner_id.eq(query.runner_id))
+            .filter(slots::controller_id.eq(query.controller_id))
             .order_by(slots::start_at.asc())
             .select(slots::start_at)
             .load::<NaiveDateTime>(&conn)
@@ -100,7 +100,7 @@ pub async fn reserve_slot(pool: web::Data<DBPool>, user: User, reserve_request: 
             .filter(
                 (slots::end_at.ge(&start_at).and(slots::end_at.le(&end_at)))
                     .or(slots::start_at.ge(&start_at).and(slots::start_at.le(&end_at)))
-            ).filter(slots::runner_id.eq(reserve_request.runner_id))
+            ).filter(slots::controller_id.eq(reserve_request.controller_id))
         ))
             .get_result(&conn)?;
 
@@ -111,7 +111,7 @@ pub async fn reserve_slot(pool: web::Data<DBPool>, user: User, reserve_request: 
         diesel::insert_into(slots::table)
             .values((
                 slots::user_id.eq(user.id),
-                slots::runner_id.eq(reserve_request.runner_id),
+                slots::controller_id.eq(reserve_request.controller_id),
                 slots::start_at.eq(start_at),
                 slots::end_at.eq(end_at)
             ))

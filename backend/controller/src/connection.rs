@@ -13,10 +13,10 @@ use log::{error, info};
 
 use shared::websocket_messages::{client, server};
 use shared::SocketErrorKind;
-use shared::{JoinServerRequest, RunnerState};
+use shared::{JoinServerRequest, ControllerState};
 
 use crate::messages::{
-    IsJobAborted, RunMessage, RunResultMessage, RunnerReceiversValueMessage, UpdateExecutorMessage,
+    IsJobAborted, RunMessage, RunResultMessage, ControllerReceiversValueMessage, UpdateExecutorMessage,
 };
 
 type Write = SinkWrite<Message, SplitSink<Framed<BoxedSocket, Codec>, Message>>;
@@ -35,7 +35,7 @@ pub struct Connection {
     current_timing_index: usize,
     executor: Option<Recipient<RunMessage>>,
     pending_messages: Vec<RunResultMessage>,
-    runner_state: RunnerState,
+    controller_state: ControllerState,
     is_job_aborted: bool,
 }
 
@@ -48,7 +48,7 @@ impl Connection {
             current_timing_index: 0,
             executor: None,
             pending_messages: Vec::new(),
-            runner_state: RunnerState::Idle,
+            controller_state: ControllerState::Idle,
             is_job_aborted: false,
         }
     }
@@ -80,7 +80,7 @@ impl Connection {
                         );
 
                         if let Some(executor) = &self.executor {
-                            self.runner_state = RunnerState::Running(run_experiment.data.job_id);
+                            self.controller_state = ControllerState::Running(run_experiment.data.job_id);
                             // in any case, clear the is_job_aborted
                             self.is_job_aborted = false;
 
@@ -104,13 +104,13 @@ impl Connection {
                         .map_err(|_| SocketErrorKind::InvalidMessage)?;
 
                         info!("Received abort message");
-                        match self.runner_state {
-                            RunnerState::Running(job_id) if job_id == abort_job.data.job_id => {
+                        match self.controller_state {
+                            ControllerState::Running(job_id) if job_id == abort_job.data.job_id => {
                                 info!("Setting is_job_aborted to true");
                                 self.is_job_aborted = true;
                             },
-                            RunnerState::Running(job_id) => error!("Server sent an abort message for a different job from current running job, received {}, running {}", abort_job.data.job_id, job_id),
-                            RunnerState::Idle => error!("Server sent an abort message even though controller is idle")
+                            ControllerState::Running(job_id) => error!("Server sent an abort message for a different job from current running job, received {}, running {}", abort_job.data.job_id, job_id),
+                            ControllerState::Idle => error!("Server sent an abort message even though controller is idle")
                         }
                     }
                 }
@@ -139,7 +139,7 @@ impl Connection {
     }
 
     fn try_connect(act: &mut Connection, ctx: &mut <Self as Actor>::Context) {
-        let running_job_id = if let RunnerState::Running(job_id) = act.runner_state {
+        let running_job_id = if let ControllerState::Running(job_id) = act.controller_state {
             Some(job_id)
         } else {
             None
@@ -291,14 +291,14 @@ impl Handler<UpdateExecutorMessage> for Connection {
     }
 }
 
-impl Handler<RunnerReceiversValueMessage> for Connection {
+impl Handler<ControllerReceiversValueMessage> for Connection {
     type Result = ();
 
-    fn handle(&mut self, msg: RunnerReceiversValueMessage, _: &mut Self::Context) {
+    fn handle(&mut self, msg: ControllerReceiversValueMessage, _: &mut Self::Context) {
         let message = Message::Text(
             serde_json::to_string(&server::SocketMessage {
                 kind: server::SocketMessageKind::ReceiverStatus,
-                data: server::RunnerReceiverValue { values: msg.values },
+                data: server::ControllerReceiverValue { values: msg.values },
             })
             .unwrap(),
         );
@@ -315,7 +315,7 @@ impl Handler<RunResultMessage> for Connection {
     type Result = ();
 
     fn handle(&mut self, msg: RunResultMessage, ctx: &mut Self::Context) {
-        self.runner_state = RunnerState::Idle;
+        self.controller_state = ControllerState::Idle;
         self.is_job_aborted = false;
 
         Self::upload_output_to_server(msg, self.server_url.clone(), self.access_token.clone())

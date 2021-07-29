@@ -13,7 +13,7 @@ use core::types::ModelId;
 pub struct Job {
     pub id: ModelId,
     pub experiment_id: ModelId,
-    pub runner_id: ModelId,
+    pub controller_id: ModelId,
     pub code: String,
     pub status: JobStatus,
     pub created_at: NaiveDateTime,
@@ -25,14 +25,14 @@ pub struct Job {
 pub struct SlimJob {
     pub id: ModelId,
     pub experiment_id: ModelId,
-    pub runner_id: ModelId,
+    pub controller_id: ModelId,
     pub status: JobStatus,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
 
-pub const SLIM_JOB_COLUMNS: (jobs::id, jobs::experiment_id, jobs::runner_id, jobs::status, jobs::created_at, jobs::updated_at) = (
-    jobs::id, jobs::experiment_id, jobs::runner_id, jobs::status, jobs::created_at, jobs::updated_at
+pub const SLIM_JOB_COLUMNS: (jobs::id, jobs::experiment_id, jobs::controller_id, jobs::status, jobs::created_at, jobs::updated_at) = (
+    jobs::id, jobs::experiment_id, jobs::controller_id, jobs::status, jobs::created_at, jobs::updated_at
 );
 
 

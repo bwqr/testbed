@@ -4,7 +4,7 @@ pub mod websocket_messages;
 
 
 #[derive(Deserialize, Serialize, Clone)]
-pub enum RunnerState {
+pub enum ControllerState {
     Idle,
     Running(i32),
 }

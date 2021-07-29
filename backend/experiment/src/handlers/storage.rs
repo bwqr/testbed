@@ -11,13 +11,13 @@ use futures_util::stream::StreamExt as _;
 use core::{Config, ErrorMessage as CoreErrorMessage};
 use core::error::ErrorMessaging;
 use core::responses::{SuccessResponse, TokenResponse};
-use core::schema::{experiments, jobs, runners};
+use core::schema::{experiments, jobs, controllers};
 use core::types::{DBPool, ModelId, Result};
 use core::utils::Hash;
 use user::models::user::User;
 
 use crate::ErrorMessage;
-use crate::models::runner::{Runner, RunnerToken};
+use crate::models::controller::{Controller, ControllerToken};
 
 #[get("job/{id}/output")]
 pub async fn download_job_output(pool: web::Data<DBPool>, job_id: web::Path<ModelId>, user: User, config: web::Data<Arc<Config>>) -> Result<NamedFile> {
@@ -53,25 +53,25 @@ pub async fn store_job_output(
     pool: web::Data<DBPool>,
     hash: web::Data<Hash>,
     config: web::Data<Arc<Config>>,
-    runner_token: web::Query<TokenResponse>,
+    controller_token: web::Query<TokenResponse>,
     mut stream: web::Payload,
     job_id: web::Path<ModelId>,
 )
     -> Result<Json<SuccessResponse>> {
     let conn = pool.get().unwrap();
     let job_id = job_id.into_inner();
-    let token = hash.decode::<RunnerToken>(runner_token.token.as_str())
+    let token = hash.decode::<ControllerToken>(controller_token.token.as_str())
         .map_err(|_| CoreErrorMessage::InvalidToken)?;
 
     web::block(move || -> Result<()> {
-        let runner = runners::table
-            .filter(runners::access_key.eq(token.access_key))
-            .first::<Runner>(&conn)?;
+        let controller = controllers::table
+            .filter(controllers::access_key.eq(token.access_key))
+            .first::<Controller>(&conn)?;
 
         let job_exists = diesel::dsl::select(diesel::dsl::exists(
             jobs::table
                 .filter(jobs::id.eq(job_id))
-                .filter(jobs::runner_id.eq(runner.id))
+                .filter(jobs::controller_id.eq(controller.id))
         )).get_result(&conn)?;
 
         if job_exists {

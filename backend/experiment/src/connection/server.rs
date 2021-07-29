@@ -11,18 +11,18 @@ use core::db::DieselEnum;
 use core::schema::{experiments, jobs};
 use core::types::{DBPool, ModelId};
 use service::{Notification, NotificationKind, NotificationMessage, NotificationServer};
-use shared::RunnerState;
+use shared::ControllerState;
 
-use crate::connection::messages::{DisconnectServerMessage, JoinServerMessage, RunMessage, RunResultMessage, UpdateRunnerValue};
+use crate::connection::messages::{DisconnectServerMessage, JoinServerMessage, RunMessage, RunResultMessage, UpdateControllerValue};
 use crate::connection::ReceiverValues;
 use crate::connection::session::Session;
 use crate::models::job::JobStatus;
 
 pub use crate::connection::messages::AbortRunningJob;
 
-struct ConnectedRunner {
+struct ConnectedController {
     session: Addr<Session>,
-    state: RunnerState,
+    state: ControllerState,
     receiver_values: Option<Vec<u8>>,
 }
 
@@ -31,13 +31,13 @@ struct ConnectedRunner {
 pub struct RunExperiment {
     pub code: String,
     pub job_id: ModelId,
-    pub runner_id: ModelId,
+    pub controller_id: ModelId,
     pub user_id: ModelId,
 }
 
 pub struct ExperimentServer {
     pool: DBPool,
-    runners: HashMap<ModelId, ConnectedRunner>,
+    controllers: HashMap<ModelId, ConnectedController>,
     notification: Addr<NotificationServer>,
 }
 
@@ -45,24 +45,24 @@ impl ExperimentServer {
     pub fn new(pool: DBPool, notification: Addr<NotificationServer>) -> Self {
         ExperimentServer {
             pool,
-            runners: HashMap::new(),
+            controllers: HashMap::new(),
             notification,
         }
     }
 
-    async fn try_next_job(conn: PooledConnection<ConnectionManager<PgConnection>>, runner_id: ModelId) -> Option<RunExperiment> {
+    async fn try_next_job(conn: PooledConnection<ConnectionManager<PgConnection>>, controller_id: ModelId) -> Option<RunExperiment> {
         web::block(move || {
             // TODO https://trello.com/c/1qCVgmn6
             jobs::table
                 .inner_join(experiments::table)
                 .filter(jobs::status.eq(JobStatus::Pending.value()))
-                .filter(jobs::runner_id.eq(runner_id))
+                .filter(jobs::controller_id.eq(controller_id))
                 .select((experiments::user_id, jobs::id, jobs::code))
                 .first::<(ModelId, ModelId, String)>(&conn)
                 .map(|job| RunExperiment {
                     code: job.2,
                     job_id: job.1,
-                    runner_id,
+                    controller_id,
                     user_id: job.0,
                 })
         })
@@ -89,21 +89,21 @@ impl ExperimentServer {
     }
 
     fn run(&mut self, experiment: RunExperiment, ctx: &mut <Self as Actor>::Context) -> Result<(), &'static str> {
-        let mut runner: &mut ConnectedRunner = self.runners.get_mut(&experiment.runner_id)
-            .ok_or("runner is not yet connected")?;
+        let mut controller: &mut ConnectedController = self.controllers.get_mut(&experiment.controller_id)
+            .ok_or("controller is not yet connected")?;
 
-        if let RunnerState::Running(_) = &runner.state {
-            return Err("runner is already running an experiment");
+        if let ControllerState::Running(_) = &controller.state {
+            return Err("controller is already running an experiment");
         }
 
-        runner.state = RunnerState::Running(experiment.job_id);
+        controller.state = ControllerState::Running(experiment.job_id);
 
         // otherwise try to run experiment
         // clone some necessary vars
-        let session = runner.session.clone();
+        let session = controller.session.clone();
         let user_id = experiment.user_id;
         let job_id = experiment.job_id;
-        // send experiment to the runner
+        // send experiment to the controller
         async move {
             session.send(RunMessage {
                 job_id: experiment.job_id,
@@ -119,9 +119,9 @@ impl ExperimentServer {
                 let status = match res {
                     Ok(_) => JobStatus::Running,
                     Err(e) => {
-                        error!("Error while sending job to runner, {:?}", e);
+                        error!("Error while sending job to controller, {:?}", e);
                         // TODO https://trello.com/c/nqKV1x8B
-                        // schedule another job, update runner state to Idle
+                        // schedule another job, update controller state to Idle
                         JobStatus::Failed
                     }
                 };
@@ -183,30 +183,30 @@ impl Handler<JoinServerMessage> for ExperimentServer {
     type Result = ();
 
     fn handle(&mut self, msg: JoinServerMessage, ctx: &mut Self::Context) {
-        // insert runner
-        self.runners.insert(msg.runner_id, ConnectedRunner {
+        // insert controller
+        self.controllers.insert(msg.controller_id, ConnectedController {
             state: msg.state.clone(),
             session: msg.addr,
             receiver_values: None,
         });
 
-        if let RunnerState::Idle = msg.state {
+        if let ControllerState::Idle = msg.state {
             // copy some necessary vals
-            let runner_id = msg.runner_id;
+            let controller_id = msg.controller_id;
 
            // try to run a job
             let conn = self.pool.get().unwrap();
             async move {
-                Self::try_next_job(conn, runner_id)
+                Self::try_next_job(conn, controller_id)
                     .await
             }
                 .into_actor(self)
                 .then(move |res: Option<RunExperiment>, act: &mut Self, ctx: _| {
                     if let Some(run) = res {
-                        // maybe runner disconnected, so check it
-                        if act.runners.contains_key(&runner_id) {
+                        // maybe controller disconnected, so check it
+                        if act.controllers.contains_key(&controller_id) {
                             if let Err(e) = act.run(run, ctx) {
-                                error!("Unexpectedly Runner is in running state, {}", e)
+                                error!("Unexpectedly Controller is in running state, {}", e)
                             }
                         }
                     }
@@ -222,7 +222,7 @@ impl Handler<DisconnectServerMessage> for ExperimentServer {
     type Result = ();
 
     fn handle(&mut self, msg: DisconnectServerMessage, _: &mut Self::Context) {
-        self.runners.remove(&msg.runner_id);
+        self.controllers.remove(&msg.controller_id);
     }
 }
 
@@ -232,21 +232,21 @@ impl Handler<RunResultMessage> for ExperimentServer {
     fn handle(&mut self, msg: RunResultMessage, ctx: &mut Self::Context) {
         info!("got result {} id {}", msg.successful, msg.job_id);
 
-        if let Some(runner) = self.runners.get_mut(&msg.runner_id) {
-            // TODO Maybe runner sent an older job's result, so we should check if currently running job
+        if let Some(controller) = self.controllers.get_mut(&msg.controller_id) {
+            // TODO Maybe controller sent an older job's result, so we should check if currently running job
             // is equal to received msg.job_id
-            runner.state = RunnerState::Idle;
+            controller.state = ControllerState::Idle;
             let conn = self.pool.get().unwrap();
-            let runner_id = msg.runner_id;
+            let controller_id = msg.controller_id;
             async move {
-                Self::try_next_job(conn, runner_id)
+                Self::try_next_job(conn, controller_id)
                     .await
             }
                 .into_actor(self)
                 .then(move |res: Option<RunExperiment>, act: &mut Self, ctx: _| {
                     if let Some(run) = res {
-                        // maybe runner disconnected, so check it
-                        if act.runners.contains_key(&runner_id) {
+                        // maybe controller disconnected, so check it
+                        if act.controllers.contains_key(&controller_id) {
                             if let Err(e) = act.run(run, ctx) {
                                 error!("Failed to run experiment, {}", e);
                             }
@@ -299,15 +299,15 @@ impl Handler<RunResultMessage> for ExperimentServer {
 impl Handler<ReceiverValues> for ExperimentServer {
     type Result = <ReceiverValues as Message>::Result;
     fn handle(&mut self, msg: ReceiverValues, _: &mut Self::Context) -> Self::Result {
-        Ok(self.runners.get(&msg.runner_id).ok_or(())?.receiver_values.clone())
+        Ok(self.controllers.get(&msg.controller_id).ok_or(())?.receiver_values.clone())
     }
 }
 
-impl Handler<UpdateRunnerValue> for ExperimentServer {
+impl Handler<UpdateControllerValue> for ExperimentServer {
     type Result = ();
-    fn handle(&mut self, msg: UpdateRunnerValue, _: &mut Self::Context) -> Self::Result {
-        if let Some(runner) = self.runners.get_mut(&msg.runner_id) {
-            runner.receiver_values = Some(msg.values)
+    fn handle(&mut self, msg: UpdateControllerValue, _: &mut Self::Context) -> Self::Result {
+        if let Some(controller) = self.controllers.get_mut(&msg.controller_id) {
+            controller.receiver_values = Some(msg.values)
         }
     }
 }
@@ -315,8 +315,8 @@ impl Handler<UpdateRunnerValue> for ExperimentServer {
 impl Handler<AbortRunningJob> for ExperimentServer {
     type Result = ();
     fn handle(&mut self, msg: AbortRunningJob, _: &mut Self::Context) -> Self::Result {
-        if let Some(runner) = self.runners.get_mut(&msg.runner_id) {
-            runner.session.do_send(msg)
+        if let Some(controller) = self.controllers.get_mut(&msg.controller_id) {
+            controller.session.do_send(msg)
         }
     }
 }
