@@ -24,6 +24,8 @@ tags:
     description: Managing the slots
   - name: user
     description: User's information
+security:
+  - BearerAuth: []
 paths:
   /auth/login:
     post:
@@ -31,6 +33,7 @@ paths:
         - auth
       summary: Authorizes the given credentials and returns a token with a one day expire time
       operationId: login
+      security: []
       requestBody:
         description: User's credentials
         content:
@@ -60,6 +63,7 @@ paths:
         - auth
       summary: Creates a new user with given values
       operationId: signUp
+      security: []
       requestBody:
         description: User's information
         content:
@@ -87,6 +91,7 @@ paths:
         - auth
       summary: Sends a reset password email to given email address if it does exists
       operationId: forgotPassword
+      security: []
       requestBody:
         description: Email of user
         content:
@@ -112,6 +117,7 @@ paths:
         - auth
       summary: Resets password with a valid token sent via email
       operationId: resetPassword
+      security: []
       requestBody:
         description: New password and valid token sent via email
         content:
@@ -143,6 +149,7 @@ paths:
         - auth
       summary: Verify user account
       operationId: verifyAccount
+      security: []
       requestBody:
         description: Token sent via email when user signed up
         content:
@@ -174,6 +181,8 @@ paths:
         - experiment
       summary: Controller devices use this endpoint to create websocket connection. Will not return until connection is closed
       operationId: experimentWs
+      security:
+        - QueryAuth: []
       parameters:
         - in: query
           name: token
@@ -207,6 +216,8 @@ paths:
         - experiment
       summary: Controller devices use this endpoint to upload output of a job
       operationId: storeJobOutput
+      security:
+        - QueryAuth: []
       parameters:
         - in: path
           name: id
@@ -1242,3 +1253,7 @@ components:
     BearerAuth:
       type: http
       scheme: bearer
+    QueryAuth:
+      type: apiKey
+      in: query
+      name: token
