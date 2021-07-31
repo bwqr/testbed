@@ -1,8 +1,8 @@
 openapi: 3.0.1
 info:
   title: Nanonetworking Testbed API
-  description: 'This application provides state management of Nanonetworking Testbed API project. You can find the project in [here](https://github.com/nanonetworking/kr-testbed-api).'
-  termsOfService: 'NO'
+  description: "This application provides state management of Nanonetworking Testbed API project. You can find the project in [here](https://github.com/nanonetworking/kr-testbed-api)."
+  termsOfService: "NO"
   contact:
     email: nrg@boun.edu.tr
   license:
@@ -13,22 +13,22 @@ externalDocs:
   description: You can reach out the docs from here
   url: https://github.com/nanonetworking/kr-testbed-api
 servers:
-- url: https://stapiac.westeurope.cloudapp.azure.com/api
-- url: http://127.0.0.1:8040/api
+  - url: https://stapiac.westeurope.cloudapp.azure.com/api
+  - url: http://127.0.0.1:8040/api
 tags:
-- name: auth
-  description: Authorization of user
-- name: experiment
-  description: Managing the experiments
-- name: slot
-  description: Managing the slots
-- name: user
-  description: User's information
+  - name: auth
+    description: Authorization of user
+  - name: experiment
+    description: Managing the experiments
+  - name: slot
+    description: Managing the slots
+  - name: user
+    description: User's information
 paths:
   /auth/login:
     post:
       tags:
-      - auth
+        - auth
       summary: Authorizes the given credentials and returns a token with a one day expire time
       operationId: login
       requestBody:
@@ -36,28 +36,28 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: "#/components/schemas/LoginRequest"
         required: true
       responses:
         200:
           description: Successful authorization
-          content: 
+          content:
             application/json:
-              schema: 
-                $ref: '#/components/schemas/Token'
+              schema:
+                $ref: "#/components/schemas/Token"
         422:
           description: Failed authorization. Reason can be invalid credentials, not verified user or banned user
-          content: 
+          content:
             application/json:
               schema:
                 oneOf:
-                  - $ref: '#/components/schemas/InvalidCredentialsOrUser'
-                  - $ref: '#/components/schemas/NotVerified'
-                  - $ref: '#/components/schemas/Banned'
+                  - $ref: "#/components/schemas/InvalidCredentialsOrUser"
+                  - $ref: "#/components/schemas/NotVerified"
+                  - $ref: "#/components/schemas/Banned"
   /auth/sign-up:
     post:
       tags:
-      - auth
+        - auth
       summary: Creates a new user with given values
       operationId: signUp
       requestBody:
@@ -65,26 +65,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SignUpRequest'
+              $ref: "#/components/schemas/SignUpRequest"
       responses:
         200:
           description: Successful
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: "#/components/schemas/SuccessResponse"
         422:
           description: At least one of the given values are invalid or missing
           content:
             application/json:
               schema:
                 oneOf:
-                  - $ref: '#/components/schemas/ValidationError'
-                  - $ref: '#/components/schemas/UserExists'
+                  - $ref: "#/components/schemas/ValidationError"
+                  - $ref: "#/components/schemas/UserExists"
   /auth/forgot-password:
     post:
       tags:
-      - auth
+        - auth
       summary: Sends a reset password email to given email address if it does exists
       operationId: forgotPassword
       requestBody:
@@ -92,24 +92,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ForgotPasswordRequest'
+              $ref: "#/components/schemas/ForgotPasswordRequest"
       responses:
         200:
           description: Successful
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: "#/components/schemas/SuccessResponse"
         404:
           description: User not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ItemNotFound'
+                $ref: "#/components/schemas/ItemNotFound"
   /auth/reset-password:
     post:
       tags:
-      - auth
+        - auth
       summary: Resets password with a valid token sent via email
       operationId: resetPassword
       requestBody:
@@ -117,61 +117,61 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ResetPasswordRequest'
+              $ref: "#/components/schemas/ResetPasswordRequest"
       responses:
         200:
           description: Password updated successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: "#/components/schemas/SuccessResponse"
         401:
           description: Invalid token provided
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InvalidToken'
+                $ref: "#/components/schemas/InvalidToken"
         422:
           description: At least one of the given values are invalid or missing
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ValidationError'
+                $ref: "#/components/schemas/ValidationError"
   /auth/verify-account:
     post:
       tags:
-      - auth
+        - auth
       summary: Verify user account
       operationId: verifyAccount
       requestBody:
         description: Token sent via email when user signed up
         content:
           application/json:
-            schema: 
-              $ref: '#/components/schemas/Token'
+            schema:
+              $ref: "#/components/schemas/Token"
       responses:
         200:
           description: User verified
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: "#/components/schemas/SuccessResponse"
         401:
           description: Invalid token provided
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InvalidToken'
+                $ref: "#/components/schemas/InvalidToken"
         422:
           description: User not in NotVerified status
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InvalidOperationForStatus'
+                $ref: "#/components/schemas/InvalidOperationForStatus"
   /experiment/ws:
     get:
       tags:
-      - experiment
+        - experiment
       summary: Controller devices use this endpoint to create websocket connection. Will not return until connection is closed
       operationId: experimentWs
       parameters:
@@ -194,17 +194,17 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InvalidToken'
+                $ref: "#/components/schemas/InvalidToken"
         404:
           description: Unknown controller
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ItemNotFound'
+                $ref: "#/components/schemas/ItemNotFound"
   /experiment/job/{id}/output:
     post:
       tags:
-      - experiment
+        - experiment
       summary: Controller devices use this endpoint to upload output of a job
       operationId: storeJobOutput
       parameters:
@@ -223,7 +223,7 @@ paths:
       requestBody:
         description: Output of job in binary format
         content:
-          octet/stream:
+          text/plain:
             schema:
               type: string
               example: binary
@@ -234,29 +234,61 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: "#/components/schemas/SuccessResponse"
         401:
           description: Invalid token provided
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InvalidToken'
+                $ref: "#/components/schemas/InvalidToken"
         404:
           description: Unknown controller
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ItemNotFound'
+                $ref: "#/components/schemas/ItemNotFound"
         500:
           description: An error occurred while performing IO
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IOError'
+                $ref: "#/components/schemas/IOError"
+    get:
+      tags:
+        - experiment
+      summary: Download the output of job for given id
+      operationId: downloadOutput
+      parameters:
+        - in: path
+          name: id
+          description: id of the job
+          schema:
+            type: integer
+          required: true
+      responses:
+        200:
+          description: Output of the job
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "0, 1"
+        404:
+          description: Job not found or not belonging to authorized user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemNotFound"
+        500:
+          description: An error occurred while performing IO
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IOError"
   /experiment/controllers:
     get:
       tags:
-      - experiment
+        - experiment
       summary: Returns all controllers
       operationId: fetchControllers
       responses:
@@ -267,11 +299,11 @@ paths:
               schema:
                 type: array
                 items:
-                    $ref: '#/components/schemas/SlimController'
+                  $ref: "#/components/schemas/SlimController"
   /experiment/controller/{id}:
     get:
       tags:
-      - experiment
+        - experiment
       summary: Returns controller
       operationId: fetchController
       parameters:
@@ -287,17 +319,17 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SlimController'
+                $ref: "#/components/schemas/SlimController"
         404:
           description: Unknown controller
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ItemNotFound'
+                $ref: "#/components/schemas/ItemNotFound"
   /experiment/experiments:
     get:
       tags:
-      - experiment
+        - experiment
       summary: Returns all experiments belongs to the authorized user
       operationId: fetchExperiments
       responses:
@@ -308,12 +340,12 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/SlimExperiment'
+                  $ref: "#/components/schemas/SlimExperiment"
   /experiment/experiment/{id}:
     get:
       tags:
-      - experiment
-      summary: Returns experiment belongs to the user. If experiment with given id does not belong to the authorized user, not found error will be returned
+        - experiment
+      summary: Returns experiment belongs to the user. If experiment with given id does not belonging to the authorized user, not found error will be returned
       operationId: fetchExperiment
       parameters:
         - in: path
@@ -328,18 +360,62 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Experiment'
+                $ref: "#/components/schemas/Experiment"
         404:
-          description: Experiment not found or not belong to authorized user
+          description: Experiment not found or not belonging to authorized user
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ItemNotFound'
+                $ref: "#/components/schemas/ItemNotFound"
+    put:
+      tags:
+        - experiment
+      summary: Update experiment for given id. Return success response even experiment does not belong to authorized user.
+      operationId: updateExperimentName
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: id of experiment
+      requestBody:
+        description: Updated name of the experiment
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentNameRequest"
+      responses:
+        200:
+          description: Experiment's name updated if experiment belongs to authorized user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags:
+        - experiment
+      summary: Delete experiment for given id and all jobs belonging to the experiment. Return success response even experiment does not belong to authorized user.
+      operationId: deleteExperiment
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: id of experiment
+      responses:
+        200:
+          description: Delete the experiment and all of its jobs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
   /experiment/experiment/{id}/jobs:
     get:
       tags:
-      - experiment
-      summary: Returns tuples of job and controller belong to given experiment id as paginated
+        - experiment
+      summary: Returns tuples of slim job and slim controller belong to given experiment id as paginated
       operationId: fetchJobs
       parameters:
         - in: path
@@ -361,18 +437,360 @@ paths:
           description: current page
       responses:
         200:
-          description: Tuples of job and controller belong to the given experiment
+          description: Tuples of slim job and slim controller belong to the given experiment
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SlimJobSlimControllerPagination'
+                $ref: "#/components/schemas/SlimJobSlimControllerPagination"
         404:
-          description: Experiment not found or not belong to authorized user
+          description: Experiment not found or not belonging to authorized user
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ItemNotFound'
-
+                $ref: "#/components/schemas/ItemNotFound"
+  /experiment/job/{id}:
+    get:
+      tags:
+        - experiment
+      summary: Returns tuple of job and slim controller for given Id
+      operationId: fetchJob
+      parameters:
+        - in: path
+          name: id
+          description: id of the job
+          schema:
+            type: integer
+          required: true
+      responses:
+        200:
+          description: Tuple of job and slim controller for given id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobSlimController"
+        404:
+          description: Job not found or not belonging to authorized user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemNotFound"
+  /experiment/job/{id}/abort:
+    delete:
+      tags:
+        - experiment
+      summary: Abort the job for given id. Only Running or Pending jobs can be aborted
+      operationId: abortJob
+      parameters:
+        - in: path
+          name: id
+          description: id of the job
+          schema:
+            type: integer
+          required: true
+      responses:
+        200:
+          description: Job aborted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        404:
+          description: Job not found or not belonging to authorized user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemNotFound"
+        422:
+          description: Job status not Running or Pending
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvalidOperationForStatus"
+  /experiment/experiment:
+    post:
+      tags:
+        - experiment
+      summary: Create new experiment
+      operationId: storeExperiment
+      requestBody:
+        description: Name of the experiment
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentNameRequest"
+      responses:
+        200:
+          description: Experiment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+  /experiment/experiment/{id}/code:
+    put:
+      tags:
+        - experiment
+      summary: Update code of the experiment. Return success response even experiment does not belong to authorized user.
+      operationId: updateExperimentCode
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: id of experiment
+      requestBody:
+        description: Code of the experiment
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentCodeRequest"
+      responses:
+        200:
+          description: Updated code of the experiment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+  /experiment/{experiment_id}/run/{controller_id}:
+    post:
+      tags:
+        - experiment
+      summary: Run an experiment on a controller
+      operationId: runExperiment
+      parameters:
+        - in: path
+          name: experiment_id
+          schema:
+            type: integer
+          required: true
+          description: id of experiment
+        - in: path
+          name: controller_id
+          schema:
+            type: integer
+          required: true
+          description: id of controller
+      responses:
+        200:
+          description: New job created and queued to run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        403:
+          description: Current slot not belonging to authorized user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotAllowedToRunForSlots"
+        404:
+          description: Experiment or controller not found or experiment not belonging to authorized user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemNotFound"
+  /experiment/controller/{id}/values:
+    get:
+      tags:
+        - experiment
+      summary: Returns latest values read from controller's receiver devices
+      operationId: fetchControllerValues
+      parameters:
+        - in: path
+          name: id
+          description: id of controller
+          schema:
+            type: integer
+          required: true
+      responses:
+        200:
+          description: values read from controller's receiver devices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiverValues"
+        404:
+          description: Unknown controller
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemNotFound"
+  /slot/slots:
+    get:
+      tags:
+        - slot
+      summary: Returns list of tuple of slot and slim controller where slot endAt is greater than now
+      operationId: fetchSlots
+      responses:
+        200:
+          description: List of tuple of slot and slim controller
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SlotSlimController"
+  /slot/slot/{id}:
+    get:
+      tags:
+        - slot
+      summary: Returns slot for given id
+      operationId: fetchSlot
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          description: id of slot
+          required: true
+      responses:
+        200:
+          description: Slot for given id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Slot"
+        404:
+          description: Slot not found or not belonging to authorized user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemNotFound"
+    delete:
+      tags:
+        - slot
+      summary: Delete slot for given id if slot startAt is greater than now. Return success response even slot does not belong to authorized user.
+      operationId: deleteSlot
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          description: id of slot
+          required: true
+      responses:
+        200:
+          description: Slot for given id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        422:
+          description: Slot startAt is less than now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvalidOperationForStatus"
+  /slot/slots/reserved:
+    get:
+      tags:
+        - slot
+      summary: Returns already reserved slots' startAt values for given queries
+      operationId: fetchReservedSlots
+      parameters:
+        - in: query
+          name: startAt
+          description: filter reserved slots whose startAt is greater than given value
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: controllerId
+          description: filter reserved slots whose controller id is given value
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: count
+          description: filter reserved slots whose startAt is less than given value times a slot time plus given startAt query parameter.
+          required: true
+          schema:
+            type: integer
+      responses:
+        200:
+          description: Reserved slots' startAt values for given queries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  format: date-time
+  /slot/slot:
+    post:
+      tags:
+        - slot
+      summary: Reserve a new slot for given controller. Given startAt will be reduced into to beginning of slot.
+      operationId: reserveSlot
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlotReserveRequest"
+      responses:
+        200:
+          description: Reserved slot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Slot"
+        422:
+          description: Slot is already reserved or given startAt is less than beginning of current time's slot.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/InvalidSlotInterval"
+                  - $ref: "#/components/schemas/AlreadyReserved"
+  /user/profile:
+    get:
+      tags:
+        - user
+      summary: Returns authorized user profile
+      operationId: fetchProfile
+      responses:
+        200:
+          description: Profile of user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      tags:
+        - user
+      summary: Updaet authorized user profile
+      operationId: updateProfile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        200:
+          description: User profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+  /user/password:
+    put:
+      tags:
+        - user
+      summary: Update authorized user password
+      operationId: updatePassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePasswordRequest"
+      responses:
+        200:
+          description: User password updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
 components:
   schemas:
     Pagination:
@@ -455,6 +873,49 @@ components:
       required:
         - token
         - password
+    ExperimentNameRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: My Experiment
+      required:
+        - name
+    ExperimentCodeRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          example: print('my python code')
+      required:
+        - code
+    SlotReserveRequest:
+      type: object
+      properties:
+        startAt:
+          type: string
+          format: date-time
+        controllerId:
+          type: integer
+      required:
+        - startAt
+        - controllerId
+    UpdateProfileRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          example: My First Name
+        lastName:
+          type: string
+          example: My Last Name
+    UpdatePasswordRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          format: password
+          example: password
     Token:
       type: object
       properties:
@@ -497,7 +958,7 @@ components:
           format: date-time
     Experiment:
       allOf:
-        - $ref: '#/components/schemas/SlimExperiment'
+        - $ref: "#/components/schemas/SlimExperiment"
         - type: object
           properties:
             code:
@@ -521,16 +982,33 @@ components:
         controllerId:
           type: integer
         status:
-          $ref: '#/components/schemas/JobStatus'
+          $ref: "#/components/schemas/JobStatus"
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
+    Job:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/SlimJob"
+        - type: object
+          properties:
+            code:
+              type: string
+              example: print('my python code')
+    JobSlimController:
+      type: array
+      items:
+        oneOf:
+          - $ref: "#/components/schemas/Job"
+          - $ref: "#/components/schemas/SlimController"
+        minLength: 2
+        maxLength: 2
     SlimJobSlimControllerPagination:
       allOf:
-        - $ref: '#/components/schemas/Pagination'
+        - $ref: "#/components/schemas/Pagination"
         - type: object
           properties:
             items:
@@ -539,14 +1017,73 @@ components:
                 type: array
                 items:
                   oneOf:
-                    - $ref: '#/components/schemas/SlimJob'
-                    - $ref: '#/components/schemas/SlimController'
+                    - $ref: "#/components/schemas/SlimJob"
+                    - $ref: "#/components/schemas/SlimController"
                 minLength: 2
                 maxLength: 2
+    Slot:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        controllerId:
+          type: integer
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    SlotSlimController:
+      type: array
+      items:
+        oneOf:
+          - $ref: "#/components/schemas/Slot"
+          - $ref: "#/components/schemas/SlimController"
+    ReceiverValues:
+      type: object
+      properties:
+        values:
+          type: array
+          nullable: true
+          items:
+            type: integer
+    UserStatus:
+      type: string
+      enum:
+        - NotVerified
+        - Verified
+        - Banned
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        firstName:
+          type: string
+          example: My First Name
+        lastName:
+          type: string
+          example: My Last Name
+        email:
+          type: string
+          example: hello@email.com
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        roleId:
+          type: integer
     ErrorMessage:
       type: object
       properties:
-        code: 
+        code:
           type: integer
           example: 400
         errorCode:
@@ -558,7 +1095,7 @@ components:
           format: snake-case
     ValidationError:
       allOf:
-        - $ref: '#/components/schemas/ErrorMessage'
+        - $ref: "#/components/schemas/ErrorMessage"
         - type: object
           properties:
             code:
@@ -579,10 +1116,10 @@ components:
                     message:
                       type: string
                       nullable: true
-                  
+
     InvalidCredentialsOrUser:
       allOf:
-        - $ref: '#/components/schemas/ErrorMessage'
+        - $ref: "#/components/schemas/ErrorMessage"
         - type: object
           properties:
             code:
@@ -593,7 +1130,7 @@ components:
               example: invalid_credentials
     NotVerified:
       allOf:
-        - $ref: '#/components/schemas/ErrorMessage'
+        - $ref: "#/components/schemas/ErrorMessage"
         - type: object
           properties:
             code:
@@ -604,7 +1141,7 @@ components:
               example: not_verified
     Banned:
       allOf:
-        - $ref: '#/components/schemas/ErrorMessage'
+        - $ref: "#/components/schemas/ErrorMessage"
         - type: object
           properties:
             code:
@@ -615,7 +1152,7 @@ components:
               example: banned
     UserExists:
       allOf:
-        - $ref: '#/components/schemas/ErrorMessage'
+        - $ref: "#/components/schemas/ErrorMessage"
         - type: object
           properties:
             code:
@@ -626,7 +1163,7 @@ components:
               example: user_exists
     ItemNotFound:
       allOf:
-        - $ref: '#/components/schemas/ErrorMessage'
+        - $ref: "#/components/schemas/ErrorMessage"
         - type: object
           properties:
             code:
@@ -637,7 +1174,7 @@ components:
               example: item_not_found
     InvalidToken:
       allOf:
-        - $ref: '#/components/schemas/ErrorMessage'
+        - $ref: "#/components/schemas/ErrorMessage"
         - type: object
           properties:
             code:
@@ -648,7 +1185,7 @@ components:
               example: invalid_token
     InvalidOperationForStatus:
       allOf:
-        - $ref: '#/components/schemas/ErrorMessage'
+        - $ref: "#/components/schemas/ErrorMessage"
         - type: object
           properties:
             code:
@@ -659,7 +1196,7 @@ components:
               example: invalid_operation_for_status
     IOError:
       allOf:
-        - $ref: '#/components/schemas/ErrorMessage'
+        - $ref: "#/components/schemas/ErrorMessage"
         - type: object
           properties:
             code:
@@ -668,6 +1205,39 @@ components:
               example: 116
             message:
               example: io_error
+    NotAllowedToRunForSlots:
+      allOf:
+        - $ref: "#/components/schemas/ErrorMessage"
+        - type: object
+          properties:
+            code:
+              example: 403
+            errorCode:
+              example: 101
+            message:
+              example: now_allowed_to_run_for_slot
+    InvalidSlotInterval:
+      allOf:
+        - $ref: "#/components/schemas/ErrorMessage"
+        - type: object
+          properties:
+            code:
+              example: 422
+            errorCode:
+              example: 100
+            message:
+              example: invalid_slot_interval
+    AlreadyReserved:
+      allOf:
+        - $ref: "#/components/schemas/ErrorMessage"
+        - type: object
+          properties:
+            code:
+              example: 422
+            errorCode:
+              example: 101
+            message:
+              example: already_reserved
   securitySchemes:
     BearerAuth:
       type: http
