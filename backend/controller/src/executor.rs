@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 use std::net::SocketAddr;
-use std::process::{Child, ExitStatus, Stdio};
+use std::process::{ExitStatus, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -13,6 +13,7 @@ use crate::executor::limits::{MAX_CPU_CORE, MAX_MEMORY_USAGE};
 use crate::messages::{RunMessage, ControllerReceiversValueMessage, RunResultMessage, IsJobAborted};
 use crate::ModelId;
 use crate::state::{Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, State};
+use crate::process::ChildWrapper;
 
 const PYTHON_VERSION: &str = "3.9";
 const ALPINE_VERSION: &str = "3.13";
@@ -21,6 +22,7 @@ const ALPINE_VERSION: &str = "3.13";
 const SEND_RECEIVERS_VALUES_INTERVAL: u64 = 10;
 
 mod limits {
+    // in megabyte
     pub const MAX_MEMORY_USAGE: u32 = 512;
     // number of core
     pub const MAX_CPU_CORE: u32 = 1;
@@ -79,25 +81,21 @@ impl Executor {
         Ok(())
     }
 
-    fn remove_dir(&self, script_dir: &str) -> Result<(), Error> {
+    fn remove_dir(script_dir: &str) -> Result<(), Error> {
         std::fs::remove_dir_all(script_dir)
             .map_err(|e| Error::IO(e))
     }
 
-    fn gather_outputs(child: Child) -> Result<String, Error> {
-        let mut output = String::new();
-        child.stdout.unwrap().read_to_string(&mut output)
-            .map_err(|e| Error::IO(e))?;
-        child.stderr.unwrap().read_to_string(&mut output)
-            .map_err(|e| Error::IO(e))?;
-
-        Ok(output)
-    }
-
-    fn wait_child_exit(mut child: Child, seconds: u32) -> Result<String, Error> {
+    fn wait_child_exit(mut child: ChildWrapper, seconds: u32) -> Result<String, Error> {
         // wait given amount of seconds until transmitter code exits
         let mut exited = false;
+
+        let mut output = String::from("");
+
         for _ in 0..seconds {
+            child.read_into(&mut output)
+                .map_err(|e| Error::Custom(String::from(e)))?;
+
             match child.try_wait() {
                 Ok(Some(status)) => {
                     exited = true;
@@ -108,7 +106,7 @@ impl Executor {
 
                     // if not successful, gather the outputs
                     if !status.success() {
-                        return Err(Error::Output(Self::gather_outputs(child)?));
+                        return Err(Error::Output(output + child.read_until_eof().map_err(|e| Error::Custom(String::from(e)))?.as_str()));
                     }
 
                     break;
@@ -122,15 +120,15 @@ impl Executor {
 
         if !exited {
             let _ = child.kill();
-            return Err(Error::Custom(format!("Child is failed to exit in {} seconds\n {}", seconds, Self::gather_outputs(child)?)));
+            return Err(Error::Custom(format!("Child is failed to exit in {} seconds\n {}", seconds, output + child.read_until_eof().map_err(|e| Error::Custom(String::from(e)))?.as_str())));
         }
 
-        Self::gather_outputs(child)
+        Ok(output)
     }
 
     fn run_transmitter_code(&self, script_dir: &str) -> Result<String, Error> {
         let child = std::process::Command::new(self.docker_path.as_str())
-            .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1", "--memory-swap", "-1", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
+            .args(&["run", "--rm", "-e", "PYTHONUNBUFFERED=1", "-e", "PYTHONDONTWRITEBYTECODE=1", "--memory-swap", "-1", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
             .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
@@ -141,17 +139,20 @@ impl Executor {
             .spawn()
             .map_err(|e| Error::Custom(format!("Failed to spawn transmitter process, {:?}", e)))?;
 
-        Self::wait_child_exit(child, 60)
+        let custom_child = ChildWrapper::new(child)
+            .map_err(|e| Error::Custom(String::from(e)))?;
+
+        Self::wait_child_exit(custom_child, 60)
     }
 
-    fn start_receiver(&self, script_dir: &str) -> Result<std::process::Child, Error> {
+    fn start_receiver(&self, script_dir: &str) -> Result<ChildWrapper, Error> {
         let devices = (&self.rx_dev_paths)
             .into_iter()
             .map(|dev| format!("--device={}", dev))
             .collect::<Vec<String>>();
 
-        std::process::Command::new(self.docker_path.as_str())
-            .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1", "-p", "8011:8011", "--memory-swap", "-1", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
+        let child = std::process::Command::new(self.docker_path.as_str())
+            .args(&["run", "--rm", "-e", "PYTHONUNBUFFERED=1", "-e", "PYTHONDONTWRITEBYTECODE=1", "-p", "8011:8011", "--memory-swap", "-1", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
             .args(&devices)
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
             .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
@@ -162,7 +163,10 @@ impl Executor {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|e| Error::Custom(format!("Failed to spawn receiver process, {:?}", e)))
+            .map_err(|e| Error::Custom(format!("Failed to spawn receiver process, {:?}", e)))?;
+
+        Ok(ChildWrapper::new(child)
+            .map_err(|e| Error::Custom(String::from(e)))?)
     }
 
     fn start_transmitter(&self) -> Result<serial::SystemPort, Error> {
@@ -186,8 +190,9 @@ impl Executor {
         Ok(port)
     }
 
-    fn run_commands(&self, state: State, port: &mut serial::SystemPort, receiver: &mut std::process::Child) -> Result<ExitReason, Error> {
+    fn run_commands(&self, state: State, port: &mut serial::SystemPort, receiver: &mut ChildWrapper) -> Result<(ExitReason, String), Error> {
         let mut buff = [0 as u8; incoming::arduino::END_MESSAGE.len()];
+        let mut output = String::new();
 
         // clear previous characters from transmitter
         port.write("\n".as_bytes())
@@ -223,11 +228,14 @@ impl Executor {
                         port.write(END_DELIMITER_NEW_LINE.as_bytes())
                             .map_err(|e| Error::IO(e))?;
 
-                        return Ok(ExitReason::ChildExit(status));
+                        return Ok((ExitReason::ChildExit(status), output));
                     }
                     Ok(None) => {}
                     Err(e) => error!("Error while trying to wait for child, {:?}", e)
                 }
+
+                receiver.read_into(&mut output)
+                    .map_err(|e| Error::Custom(String::from(e)))?;
 
                 match port.read(&mut buff) {
                     Ok(size) => {
@@ -239,8 +247,7 @@ impl Executor {
                     }
                     Err(e) => {
                         match e.kind() {
-                            // ignore TimedOut error
-                            std::io::ErrorKind::TimedOut => {}
+                            std::io::ErrorKind::TimedOut => {} // ignore TimedOut error
                             e => return Err(Error::IO(std::io::Error::from(e)))
                         }
                     }
@@ -251,7 +258,7 @@ impl Executor {
         port.write(END_DELIMITER_NEW_LINE.as_bytes())
             .map_err(|e| Error::IO(e))?;
 
-        Ok(ExitReason::EndOfExperiment)
+        Ok((ExitReason::EndOfExperiment, output))
     }
 
     fn handle_execution(&self, job_id: ModelId, code: String) -> Result<String, Error> {
@@ -263,6 +270,7 @@ impl Executor {
 
         info!("running the transmitter code");
         let serialized_state = self.run_transmitter_code(script_dir.as_str())?;
+        info!("{:?}", serialized_state);
 
         info!("decoding the state");
         let state = Decoder::decode(serialized_state.as_str())
@@ -276,7 +284,7 @@ impl Executor {
 
         info!("running commands");
         let output = match self.run_commands(state, &mut port, &mut receiver) {
-            Ok(ExitReason::EndOfExperiment) => {
+            Ok((ExitReason::EndOfExperiment, output)) => {
                 info!("experiment is ended");
 
 
@@ -293,9 +301,9 @@ impl Executor {
 
                 info!("waiting for receiver to exit and generating the output");
 
-                Self::wait_child_exit(receiver, 60)?
+                output + Self::wait_child_exit(receiver, 60)?.as_str()
             }
-            Ok(ExitReason::ChildExit(status)) => {
+            Ok((ExitReason::ChildExit(status), output)) => {
                 info!("child exited before experiment end");
 
                 // user receiver code should not exit until receiving an END_MESSAGE over tcp
@@ -308,7 +316,7 @@ impl Executor {
                 }
 
                 info!("child crashed");
-                return Err(Error::Output(Self::gather_outputs(receiver)?));
+                return Err(Error::Output(output + receiver.read_until_eof().map_err(|e| Error::Custom(String::from(e)))?.as_str()));
             }
             Err(e) => {
                 // just kill everything without checking error and return error
@@ -320,7 +328,7 @@ impl Executor {
         };
 
         info!("removing script dir");
-        self.remove_dir(script_dir.as_str())?;
+        Self::remove_dir(script_dir.as_str())?;
 
         info!("returning");
         Ok(output)
@@ -396,7 +404,7 @@ impl Handler<RunMessage> for Executor {
             Err(e) => {
                 info!("failed to execute experiment, {:?}", e);
                 // just try to remove script files, even error originated from remove_script_files, we should try it.
-                let _ = self.remove_dir(Self::gen_tmp_dir(job_id).as_str());
+                let _ = Self::remove_dir(Self::gen_tmp_dir(job_id).as_str());
 
                 (format!("{:?}", e), false)
             }

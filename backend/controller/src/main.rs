@@ -8,6 +8,7 @@ use crate::messages::{RunMessage, UpdateExecutorMessage};
 
 mod connection;
 mod executor;
+mod process;
 mod messages;
 mod state;
 
