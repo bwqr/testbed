@@ -86,46 +86,6 @@ impl Executor {
             .map_err(|e| Error::IO(e))
     }
 
-    fn wait_child_exit(mut child: ChildWrapper, seconds: u32) -> Result<String, Error> {
-        // wait given amount of seconds until transmitter code exits
-        let mut exited = false;
-
-        let mut output = String::from("");
-
-        for _ in 0..seconds {
-            child.read_into(&mut output)
-                .map_err(|e| Error::Custom(String::from(e)))?;
-
-            match child.try_wait() {
-                Ok(Some(status)) => {
-                    exited = true;
-
-                    if let Some(137) = status.code() {
-                        return Err(Error::Custom(String::from("child is killed, probably due to out of memory")));
-                    }
-
-                    // if not successful, gather the outputs
-                    if !status.success() {
-                        return Err(Error::Output(output + child.read_until_eof().map_err(|e| Error::Custom(String::from(e)))?.as_str()));
-                    }
-
-                    break;
-                }
-                Ok(None) => {}
-                Err(e) => return Err(Error::IO(e))
-            }
-
-            std::thread::sleep(Duration::from_secs(1));
-        }
-
-        if !exited {
-            let _ = child.kill();
-            return Err(Error::Custom(format!("Child is failed to exit in {} seconds\n {}", seconds, output + child.read_until_eof().map_err(|e| Error::Custom(String::from(e)))?.as_str())));
-        }
-
-        Ok(output)
-    }
-
     fn run_transmitter_code(&self, script_dir: &str) -> Result<String, Error> {
         let child = std::process::Command::new(self.docker_path.as_str())
             .args(&["run", "--rm", "-e", "PYTHONUNBUFFERED=1", "-e", "PYTHONDONTWRITEBYTECODE=1", "--memory-swap", "-1", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
@@ -142,7 +102,8 @@ impl Executor {
         let custom_child = ChildWrapper::new(child)
             .map_err(|e| Error::Custom(String::from(e)))?;
 
-        Self::wait_child_exit(custom_child, 60)
+        custom_child.wait(60)
+            .map_err(|e| Error::Custom(String::from(e)))
     }
 
     fn start_receiver(&self, script_dir: &str) -> Result<ChildWrapper, Error> {
@@ -165,8 +126,8 @@ impl Executor {
             .spawn()
             .map_err(|e| Error::Custom(format!("Failed to spawn receiver process, {:?}", e)))?;
 
-        Ok(ChildWrapper::new(child)
-            .map_err(|e| Error::Custom(String::from(e)))?)
+        ChildWrapper::new(child)
+            .map_err(|e| Error::Custom(String::from(e)))
     }
 
     fn start_transmitter(&self) -> Result<serial::SystemPort, Error> {
@@ -190,9 +151,8 @@ impl Executor {
         Ok(port)
     }
 
-    fn run_commands(&self, state: State, port: &mut serial::SystemPort, receiver: &mut ChildWrapper) -> Result<(ExitReason, String), Error> {
+    fn run_commands(&self, state: State, port: &mut serial::SystemPort, receiver: &mut ChildWrapper) -> Result<ExitReason, Error> {
         let mut buff = [0 as u8; incoming::arduino::END_MESSAGE.len()];
-        let mut output = String::new();
 
         // clear previous characters from transmitter
         port.write("\n".as_bytes())
@@ -223,18 +183,14 @@ impl Executor {
 
             // Loop until command is executed or receiver is terminated
             loop {
-                match receiver.try_wait() {
-                    Ok(Some(status)) => {
-                        port.write(END_DELIMITER_NEW_LINE.as_bytes())
-                            .map_err(|e| Error::IO(e))?;
+                if let Some(status) = receiver.is_terminated() {
+                    port.write(END_DELIMITER_NEW_LINE.as_bytes())
+                       .map_err(|e| Error::IO(e))?;
 
-                        return Ok((ExitReason::ChildExit(status), output));
-                    }
-                    Ok(None) => {}
-                    Err(e) => error!("Error while trying to wait for child, {:?}", e)
+                    return Ok(ExitReason::ChildExit(status));
                 }
 
-                receiver.read_into(&mut output)
+                receiver.read_pipes()
                     .map_err(|e| Error::Custom(String::from(e)))?;
 
                 match port.read(&mut buff) {
@@ -258,7 +214,7 @@ impl Executor {
         port.write(END_DELIMITER_NEW_LINE.as_bytes())
             .map_err(|e| Error::IO(e))?;
 
-        Ok((ExitReason::EndOfExperiment, output))
+        Ok(ExitReason::EndOfExperiment)
     }
 
     fn handle_execution(&self, job_id: ModelId, code: String) -> Result<String, Error> {
@@ -284,14 +240,14 @@ impl Executor {
 
         info!("running commands");
         let output = match self.run_commands(state, &mut port, &mut receiver) {
-            Ok((ExitReason::EndOfExperiment, output)) => {
+            Ok(ExitReason::EndOfExperiment) => {
                 info!("experiment is ended");
 
 
                 std::net::TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], 8011)), Duration::from_secs(10))
                     .map_err(|_| {
                         let _ = receiver.kill();
-                        Error::Custom(String::from("Failed tp connect receiver"))
+                        Error::Custom(String::from("Failed to connect receiver"))
                     })?
                     .write(outgoing::tcp::END_MESSAGE.as_bytes())
                     .map_err(|_| {
@@ -301,9 +257,10 @@ impl Executor {
 
                 info!("waiting for receiver to exit and generating the output");
 
-                output + Self::wait_child_exit(receiver, 60)?.as_str()
+               receiver.wait(60)
+                   .map_err(|e| Error::Custom(String::from(e)))?
             }
-            Ok((ExitReason::ChildExit(status), output)) => {
+            Ok(ExitReason::ChildExit(status)) => {
                 info!("child exited before experiment end");
 
                 // user receiver code should not exit until receiving an END_MESSAGE over tcp
@@ -316,7 +273,7 @@ impl Executor {
                 }
 
                 info!("child crashed");
-                return Err(Error::Output(output + receiver.read_until_eof().map_err(|e| Error::Custom(String::from(e)))?.as_str()));
+                return Err(Error::Output(receiver.wait(1).map_err(|e| Error::Custom(String::from(e)))?));
             }
             Err(e) => {
                 // just kill everything without checking error and return error
