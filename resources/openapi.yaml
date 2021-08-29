@@ -606,6 +606,8 @@ paths:
         - experiment
       summary: Returns latest values read from controller's receiver devices
       operationId: fetchControllerValues
+      security:
+        - AdminAuth: []
       parameters:
         - in: path
           name: id
@@ -626,6 +628,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ItemNotFound"
+  /experiment/controller/{id}/token:
+    get:
+      tags:
+        - experiment
+      summary: Generates and returns a new access token for controller
+      operationId: generateControllerToken
+      security:
+        - AdminAuth: []
+      responses:
+        200:
+          description: token a controller can use to connect backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
   /slot/slots:
     get:
       tags:
@@ -1257,3 +1274,6 @@ components:
       type: apiKey
       in: query
       name: token
+    AdminAuth:
+      type: http
+      scheme: bearer
