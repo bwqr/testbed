@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 use std::net::SocketAddr;
-use std::process::{ExitStatus, Stdio};
+use std::process::ExitStatus;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -9,24 +9,13 @@ use log::{error, info};
 use serial::core::SerialDevice;
 
 use crate::connection::Connection;
-use crate::executor::limits::{MAX_CPU_CORE, MAX_MEMORY_USAGE};
 use crate::messages::{RunMessage, ControllerReceiversValueMessage, RunResultMessage, IsJobAborted};
 use crate::ModelId;
 use crate::state::{Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, State};
-use crate::process::ChildWrapper;
-
-const PYTHON_VERSION: &str = "3.9";
-const ALPINE_VERSION: &str = "3.13";
+use crate::process::{DockerBuilder, DockerProcess};
 
 // in seconds
 const SEND_RECEIVERS_VALUES_INTERVAL: u64 = 10;
-
-mod limits {
-    // in megabyte
-    pub const MAX_MEMORY_USAGE: u32 = 512;
-    // number of core
-    pub const MAX_CPU_CORE: u32 = 1;
-}
 
 mod incoming {
     pub mod arduino {
@@ -87,46 +76,35 @@ impl Executor {
     }
 
     fn run_transmitter_code(&self, script_dir: &str) -> Result<String, Error> {
-        let child = std::process::Command::new(self.docker_path.as_str())
-            .args(&["run", "--rm", "-e", "PYTHONUNBUFFERED=1", "-e", "PYTHONDONTWRITEBYTECODE=1", "--memory-swap", "-1", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
-            .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
-            .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
-            .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
-            .args(&["python", "/usr/local/scripts/job.py", "--transmitter"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| Error::Custom(format!("Failed to spawn transmitter process, {:?}", e)))?;
-
-        let custom_child = ChildWrapper::new(child)
+        let process = DockerBuilder::new(
+            self.docker_path.as_str(),
+            self.python_lib_path.as_str(),
+            script_dir,
+            &["python", "/usr/local/scripts/job.py", "--transmitter"]
+        )
+            .name("nrgtestbed-transmitter")
+            .build()
             .map_err(|e| Error::Custom(String::from(e)))?;
 
-        custom_child.wait(60)
+        process.wait(60)
             .map_err(|e| Error::Custom(String::from(e)))
     }
 
-    fn start_receiver(&self, script_dir: &str) -> Result<ChildWrapper, Error> {
+    fn start_receiver(&self, script_dir: &str) -> Result<DockerProcess, Error> {
         let devices = (&self.rx_dev_paths)
             .into_iter()
-            .map(|dev| format!("--device={}", dev))
-            .collect::<Vec<String>>();
+            .map(|dev| dev.as_str())
+            .collect::<Vec<&str>>();
 
-        let child = std::process::Command::new(self.docker_path.as_str())
-            .args(&["run", "--rm", "-e", "PYTHONUNBUFFERED=1", "-e", "PYTHONDONTWRITEBYTECODE=1", "-p", "8011:8011", "--memory-swap", "-1", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
-            .args(&devices)
-            .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
-            .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
-            .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
-            .args(&["python", "/usr/local/scripts/job.py", "--receiver"])
-            .args(&self.rx_dev_paths)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| Error::Custom(format!("Failed to spawn receiver process, {:?}", e)))?;
-
-        ChildWrapper::new(child)
+        DockerBuilder::new(
+            self.docker_path.as_str(),
+            self.python_lib_path.as_str(),
+            script_dir,
+            &["python", "/usr/local/scripts/job.py", "--receiver"]
+        )
+            .name("nrgtestbed-receiver")
+            .devices(&devices)
+            .build()
             .map_err(|e| Error::Custom(String::from(e)))
     }
 
@@ -151,7 +129,7 @@ impl Executor {
         Ok(port)
     }
 
-    fn run_commands(&self, state: State, port: &mut serial::SystemPort, receiver: &mut ChildWrapper) -> Result<ExitReason, Error> {
+    fn run_commands(&self, state: State, port: &mut serial::SystemPort, receiver: &mut DockerProcess) -> Result<ExitReason, Error> {
         let mut buff = [0 as u8; incoming::arduino::END_MESSAGE.len()];
 
         // clear previous characters from transmitter
@@ -242,7 +220,6 @@ impl Executor {
         let output = match self.run_commands(state, &mut port, &mut receiver) {
             Ok(ExitReason::EndOfExperiment) => {
                 info!("experiment is ended");
-
 
                 std::net::TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], 8011)), Duration::from_secs(10))
                     .map_err(|_| {
