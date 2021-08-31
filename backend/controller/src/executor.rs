@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 use std::net::SocketAddr;
-use std::process::{Child, ExitStatus, Stdio};
+use std::process::ExitStatus;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -9,22 +9,13 @@ use log::{error, info};
 use serial::core::SerialDevice;
 
 use crate::connection::Connection;
-use crate::executor::limits::{MAX_CPU_CORE, MAX_MEMORY_USAGE};
 use crate::messages::{RunMessage, ControllerReceiversValueMessage, RunResultMessage, IsJobAborted};
 use crate::ModelId;
 use crate::state::{Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, State};
-
-const PYTHON_VERSION: &str = "3.9";
-const ALPINE_VERSION: &str = "3.13";
+use crate::process::{DockerBuilder, DockerProcess};
 
 // in seconds
 const SEND_RECEIVERS_VALUES_INTERVAL: u64 = 10;
-
-mod limits {
-    pub const MAX_MEMORY_USAGE: u32 = 512;
-    // number of core
-    pub const MAX_CPU_CORE: u32 = 1;
-}
 
 mod incoming {
     pub mod arduino {
@@ -79,90 +70,42 @@ impl Executor {
         Ok(())
     }
 
-    fn remove_dir(&self, script_dir: &str) -> Result<(), Error> {
+    fn remove_dir(script_dir: &str) -> Result<(), Error> {
         std::fs::remove_dir_all(script_dir)
             .map_err(|e| Error::IO(e))
     }
 
-    fn gather_outputs(child: Child) -> Result<String, Error> {
-        let mut output = String::new();
-        child.stdout.unwrap().read_to_string(&mut output)
-            .map_err(|e| Error::IO(e))?;
-        child.stderr.unwrap().read_to_string(&mut output)
-            .map_err(|e| Error::IO(e))?;
-
-        Ok(output)
-    }
-
-    fn wait_child_exit(mut child: Child, seconds: u32) -> Result<String, Error> {
-        // wait given amount of seconds until transmitter code exits
-        let mut exited = false;
-        for _ in 0..seconds {
-            match child.try_wait() {
-                Ok(Some(status)) => {
-                    exited = true;
-
-                    if let Some(137) = status.code() {
-                        return Err(Error::Custom(String::from("child is killed, probably due to out of memory")));
-                    }
-
-                    // if not successful, gather the outputs
-                    if !status.success() {
-                        return Err(Error::Output(Self::gather_outputs(child)?));
-                    }
-
-                    break;
-                }
-                Ok(None) => {}
-                Err(e) => return Err(Error::IO(e))
-            }
-
-            std::thread::sleep(Duration::from_secs(1));
-        }
-
-        if !exited {
-            let _ = child.kill();
-            return Err(Error::Custom(format!("Child is failed to exit in {} seconds\n {}", seconds, Self::gather_outputs(child)?)));
-        }
-
-        Self::gather_outputs(child)
-    }
-
     fn run_transmitter_code(&self, script_dir: &str) -> Result<String, Error> {
-        let child = std::process::Command::new(self.docker_path.as_str())
-            .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1", "--memory-swap", "-1", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
-            .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
-            .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
-            .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
-            .args(&["python", "/usr/local/scripts/job.py", "--transmitter"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| Error::Custom(format!("Failed to spawn transmitter process, {:?}", e)))?;
+        let process = DockerBuilder::new(
+            self.docker_path.as_str(),
+            self.python_lib_path.as_str(),
+            script_dir,
+            &["python", "/usr/local/scripts/job.py", "--transmitter"]
+        )
+            .name("nrgtestbed-transmitter")
+            .build()
+            .map_err(|e| Error::Custom(String::from(e)))?;
 
-        Self::wait_child_exit(child, 60)
+        process.wait(60)
+            .map_err(|e| Error::Custom(String::from(e)))
     }
 
-    fn start_receiver(&self, script_dir: &str) -> Result<std::process::Child, Error> {
+    fn start_receiver(&self, script_dir: &str) -> Result<DockerProcess, Error> {
         let devices = (&self.rx_dev_paths)
             .into_iter()
-            .map(|dev| format!("--device={}", dev))
-            .collect::<Vec<String>>();
+            .map(|dev| dev.as_str())
+            .collect::<Vec<&str>>();
 
-        std::process::Command::new(self.docker_path.as_str())
-            .args(&["run", "--rm", "-e", "PYTHONDONTWRITEBYTECODE=1", "-p", "8011:8011", "--memory-swap", "-1", "-m", format!("{}m", MAX_MEMORY_USAGE).as_str(), format!("--cpus={}", MAX_CPU_CORE).as_str()])
-            .args(&devices)
-            .args(&["--mount", format!("type=bind,source={},target=/usr/local/lib/python{}/site-packages/,readonly", self.python_lib_path.as_str(), PYTHON_VERSION).as_str()])
-            .args(&["--mount", format!("type=bind,source={},target=/usr/local/scripts/,readonly", script_dir).as_str()])
-            .arg(format!("python:{}-alpine{}", PYTHON_VERSION, ALPINE_VERSION).as_str())
-            .args(&["python", "/usr/local/scripts/job.py", "--receiver"])
-            .args(&self.rx_dev_paths)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| Error::Custom(format!("Failed to spawn receiver process, {:?}", e)))
+        DockerBuilder::new(
+            self.docker_path.as_str(),
+            self.python_lib_path.as_str(),
+            script_dir,
+            &["python", "/usr/local/scripts/job.py", "--receiver"]
+        )
+            .name("nrgtestbed-receiver")
+            .devices(&devices)
+            .build()
+            .map_err(|e| Error::Custom(String::from(e)))
     }
 
     fn start_transmitter(&self) -> Result<serial::SystemPort, Error> {
@@ -186,7 +129,7 @@ impl Executor {
         Ok(port)
     }
 
-    fn run_commands(&self, state: State, port: &mut serial::SystemPort, receiver: &mut std::process::Child) -> Result<ExitReason, Error> {
+    fn run_commands(&self, state: State, port: &mut serial::SystemPort, receiver: &mut DockerProcess) -> Result<ExitReason, Error> {
         let mut buff = [0 as u8; incoming::arduino::END_MESSAGE.len()];
 
         // clear previous characters from transmitter
@@ -218,16 +161,15 @@ impl Executor {
 
             // Loop until command is executed or receiver is terminated
             loop {
-                match receiver.try_wait() {
-                    Ok(Some(status)) => {
-                        port.write(END_DELIMITER_NEW_LINE.as_bytes())
-                            .map_err(|e| Error::IO(e))?;
+                if let Some(status) = receiver.is_terminated() {
+                    port.write(END_DELIMITER_NEW_LINE.as_bytes())
+                       .map_err(|e| Error::IO(e))?;
 
-                        return Ok(ExitReason::ChildExit(status));
-                    }
-                    Ok(None) => {}
-                    Err(e) => error!("Error while trying to wait for child, {:?}", e)
+                    return Ok(ExitReason::ChildExit(status));
                 }
+
+                receiver.read_pipes()
+                    .map_err(|e| Error::Custom(String::from(e)))?;
 
                 match port.read(&mut buff) {
                     Ok(size) => {
@@ -239,8 +181,7 @@ impl Executor {
                     }
                     Err(e) => {
                         match e.kind() {
-                            // ignore TimedOut error
-                            std::io::ErrorKind::TimedOut => {}
+                            std::io::ErrorKind::TimedOut => {} // ignore TimedOut error
                             e => return Err(Error::IO(std::io::Error::from(e)))
                         }
                     }
@@ -263,6 +204,7 @@ impl Executor {
 
         info!("running the transmitter code");
         let serialized_state = self.run_transmitter_code(script_dir.as_str())?;
+        info!("{:?}", serialized_state);
 
         info!("decoding the state");
         let state = Decoder::decode(serialized_state.as_str())
@@ -279,11 +221,10 @@ impl Executor {
             Ok(ExitReason::EndOfExperiment) => {
                 info!("experiment is ended");
 
-
                 std::net::TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], 8011)), Duration::from_secs(10))
                     .map_err(|_| {
                         let _ = receiver.kill();
-                        Error::Custom(String::from("Failed tp connect receiver"))
+                        Error::Custom(String::from("Failed to connect receiver"))
                     })?
                     .write(outgoing::tcp::END_MESSAGE.as_bytes())
                     .map_err(|_| {
@@ -293,7 +234,8 @@ impl Executor {
 
                 info!("waiting for receiver to exit and generating the output");
 
-                Self::wait_child_exit(receiver, 60)?
+               receiver.wait(60)
+                   .map_err(|e| Error::Custom(String::from(e)))?
             }
             Ok(ExitReason::ChildExit(status)) => {
                 info!("child exited before experiment end");
@@ -308,7 +250,7 @@ impl Executor {
                 }
 
                 info!("child crashed");
-                return Err(Error::Output(Self::gather_outputs(receiver)?));
+                return Err(Error::Output(receiver.wait(1).map_err(|e| Error::Custom(String::from(e)))?));
             }
             Err(e) => {
                 // just kill everything without checking error and return error
@@ -320,7 +262,7 @@ impl Executor {
         };
 
         info!("removing script dir");
-        self.remove_dir(script_dir.as_str())?;
+        Self::remove_dir(script_dir.as_str())?;
 
         info!("returning");
         Ok(output)
@@ -396,7 +338,7 @@ impl Handler<RunMessage> for Executor {
             Err(e) => {
                 info!("failed to execute experiment, {:?}", e);
                 // just try to remove script files, even error originated from remove_script_files, we should try it.
-                let _ = self.remove_dir(Self::gen_tmp_dir(job_id).as_str());
+                let _ = Self::remove_dir(Self::gen_tmp_dir(job_id).as_str());
 
                 (format!("{:?}", e), false)
             }
