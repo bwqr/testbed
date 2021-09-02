@@ -1,6 +1,5 @@
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::net::SocketAddr;
-use std::process::ExitStatus;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -11,8 +10,8 @@ use serial::core::SerialDevice;
 use crate::connection::Connection;
 use crate::messages::{RunMessage, ControllerReceiversValueMessage, RunResultMessage, IsJobAborted};
 use crate::ModelId;
-use crate::state::{Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, State};
-use crate::process::{DockerBuilder, DockerProcess};
+use crate::state::{self, Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, State};
+use crate::process::{ChildError, ChildErrorKind, DockerBuilder, DockerProcess};
 
 // in seconds
 const SEND_RECEIVERS_VALUES_INTERVAL: u64 = 10;
@@ -59,20 +58,20 @@ impl Executor {
         let file = String::from(script_dir) + "/job.py";
 
         std::fs::create_dir_all(script_dir)
-            .map_err(|e| Error::IO(e))?;
+            .map_err(|e| Error::IOError(e, "creating script dir"))?;
 
         let mut f = std::fs::File::create(file.as_str())
-            .map_err(|e| Error::IO(e))?;
+            .map_err(|e| Error::IOError(e, "creating script file"))?;
 
         f.write(code.as_bytes())
-            .map_err(|e| Error::IO(e))?;
+            .map_err(|e| Error::IOError(e, "writing script file"))?;
 
         Ok(())
     }
 
     fn remove_dir(script_dir: &str) -> Result<(), Error> {
         std::fs::remove_dir_all(script_dir)
-            .map_err(|e| Error::IO(e))
+            .map_err(|e| Error::IOError(e, "removing script dir"))
     }
 
     fn run_transmitter_code(&self, script_dir: &str) -> Result<String, Error> {
@@ -84,10 +83,10 @@ impl Executor {
         )
             .name("nrgtestbed-transmitter")
             .build()
-            .map_err(|e| Error::Custom(String::from(e)))?;
+            .map_err(|e| Error::ChildErrorKind(e))?;
 
         process.wait(60)
-            .map_err(|e| Error::Custom(String::from(e)))
+            .map_err(|e| Error::ChildError(e))
     }
 
     fn start_receiver(&self, script_dir: &str) -> Result<DockerProcess, Error> {
@@ -105,26 +104,26 @@ impl Executor {
             .name("nrgtestbed-receiver")
             .devices(&devices)
             .build()
-            .map_err(|e| Error::Custom(String::from(e)))
+            .map_err(|e| Error::ChildErrorKind(e))
     }
 
     fn start_transmitter(&self) -> Result<serial::SystemPort, Error> {
         let mut port = serial::open(self.tx_dev_path.as_str())
-            .map_err(|e| Error::Serial(e))?;
+            .map_err(|e| Error::SerialError(e, "opening serial port"))?;
 
         // Wait 5 seconds for SETUP_MESSAGE
         port.set_timeout(Duration::from_secs(5))
-            .map_err(|e| Error::Serial(e))?;
+            .map_err(|e| Error::SerialError(e, "setting serial port timeout"))?;
 
         let mut buffer = [0 as u8; incoming::arduino::SETUP_MESSAGE.len()];
 
         // read the START_MESSAGE message, we do not check if received buffer equals to START_MESSAGE since it is mostly equal.
         port.read(&mut buffer)
-            .map_err(|e| Error::IO(e))?;
+            .map_err(|e| Error::IOError(e, "reading from serial port"))?;
 
         // Other IO operations should have 1 second for timeout
         port.set_timeout(Duration::from_secs(1))
-            .map_err(|e| Error::Serial(e))?;
+            .map_err(|e| Error::SerialError(e, "setting serial port timeout"))?;
 
         Ok(port)
     }
@@ -134,9 +133,9 @@ impl Executor {
 
         // clear previous characters from transmitter
         port.write("\n".as_bytes())
-            .map_err(|e| Error::IO(e))?;
+            .map_err(|e| Error::IOError(e, "writing new line char"))?;
         port.write(START_DELIMITER_NEW_LINE.as_bytes())
-            .map_err(|e| Error::IO(e))?;
+            .map_err(|e| Error::IOError(e, "writing start delimiter new line"))?;
 
 
         for command in state.into_iter() {
@@ -149,27 +148,27 @@ impl Executor {
             });
 
             match res {
-                Ok(true) => return Err(Error::Custom(String::from("User aborted the job"))),
+                Ok(true) => return Err(Error::JobAborted),
                 Ok(false) => {},
                 Err(e) => error!("Error while checking if job is aborted, {:?}", e)
             }
 
             port.write(command.as_bytes())
-                .map_err(|e| Error::IO(e))?;
+                .map_err(|e| Error::IOError(e, "writing command to serial port"))?;
 
             let mut total_read_size = 0;
 
             // Loop until command is executed or receiver is terminated
             loop {
-                if let Some(status) = receiver.is_terminated() {
+                if receiver.is_terminated() {
                     port.write(END_DELIMITER_NEW_LINE.as_bytes())
-                       .map_err(|e| Error::IO(e))?;
+                       .map_err(|e| Error::IOError(e, "writing end delimiter new line"))?;
 
-                    return Ok(ExitReason::ChildExit(status));
+                    return Ok(ExitReason::ChildExit);
                 }
 
                 receiver.read_pipes()
-                    .map_err(|e| Error::Custom(String::from(e)))?;
+                    .map_err(|e| Error::ChildErrorKind(e))?;
 
                 match port.read(&mut buff) {
                     Ok(size) => {
@@ -179,20 +178,23 @@ impl Executor {
                             break;
                         }
                     }
-                    Err(e) => {
-                        match e.kind() {
-                            std::io::ErrorKind::TimedOut => {} // ignore TimedOut error
-                            e => return Err(Error::IO(std::io::Error::from(e)))
-                        }
-                    }
+                    Err(e) if std::io::ErrorKind::TimedOut == e.kind() => { },
+                    Err(e) => return Err(Error::IOError(e, "reading end message from serial port"))
                 }
             }
         }
 
         port.write(END_DELIMITER_NEW_LINE.as_bytes())
-            .map_err(|e| Error::IO(e))?;
+            .map_err(|e| Error::IOError(e, "writing end delimiter new line to end experiment"))?;
 
         Ok(ExitReason::EndOfExperiment)
+    }
+
+    fn send_end_of_experiment() -> Result<(), io::Error> {
+        std::net::TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], 8011)), Duration::from_secs(10))?
+            .write(outgoing::tcp::END_MESSAGE.as_bytes())?;
+
+        Ok(())
     }
 
     fn handle_execution(&self, job_id: ModelId, code: String) -> Result<String, Error> {
@@ -204,11 +206,10 @@ impl Executor {
 
         info!("running the transmitter code");
         let serialized_state = self.run_transmitter_code(script_dir.as_str())?;
-        info!("{:?}", serialized_state);
 
         info!("decoding the state");
         let state = Decoder::decode(serialized_state.as_str())
-            .map_err(|e| Error::Custom(format!("Unable to decode state, {:?}", e)))?;
+            .map_err(|e| Error::Decoding(e, serialized_state))?;
 
         info!("starting the transmitter");
         let mut port = self.start_transmitter()?;
@@ -221,36 +222,24 @@ impl Executor {
             Ok(ExitReason::EndOfExperiment) => {
                 info!("experiment is ended");
 
-                std::net::TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], 8011)), Duration::from_secs(10))
-                    .map_err(|_| {
-                        let _ = receiver.kill();
-                        Error::Custom(String::from("Failed to connect receiver"))
-                    })?
-                    .write(outgoing::tcp::END_MESSAGE.as_bytes())
-                    .map_err(|_| {
-                        let _ = receiver.kill();
-                        Error::Custom(String::from("Failed to send END_MESSAGE to receiver code"))
-                    })?;
+                if let Err(e) = Self::send_end_of_experiment() {
+                    error!("failed to send end of experiment to receiver");
+
+                    receiver.kill()
+                        .map_err(|e| Error::ChildErrorKind(e))?;
+
+                    return Err(Error::IOError(e, "sending end of experiment to receiver"));
+                }
 
                 info!("waiting for receiver to exit and generating the output");
-
-               receiver.wait(60)
-                   .map_err(|e| Error::Custom(String::from(e)))?
+                receiver.wait(60)
+                   .map_err(|e| Error::ChildError(e))?
             }
-            Ok(ExitReason::ChildExit(status)) => {
+            Ok(ExitReason::ChildExit) => {
                 info!("child exited before experiment end");
 
-                // user receiver code should not exit until receiving an END_MESSAGE over tcp
-                if status.success() {
-                    return Err(Error::Custom(String::from("User receiver code exited successfully without waiting end of experiment, this should not be the case")));
-                }
-
-                if let Some(137) = status.code() {
-                    return Err(Error::Custom(String::from("child is killed, probably due to out of memory")));
-                }
-
-                info!("child crashed");
-                return Err(Error::Output(receiver.wait(1).map_err(|e| Error::Custom(String::from(e)))?));
+                receiver.wait(1)
+                    .map_err(|e| Error::ChildError(e))?
             }
             Err(e) => {
                 // just kill everything without checking error and return error
@@ -357,13 +346,15 @@ impl Handler<RunMessage> for Executor {
 
 #[derive(Debug)]
 enum Error {
-    IO(std::io::Error),
-    Serial(serial::Error),
-    Output(String),
-    Custom(String),
+    ChildError(ChildError),
+    ChildErrorKind(ChildErrorKind),
+    IOError(io::Error, &'static str),
+    SerialError(serial::Error, &'static str),
+    JobAborted,
+    Decoding(state::Error, String)
 }
 
 enum ExitReason {
     EndOfExperiment,
-    ChildExit(ExitStatus),
+    ChildExit,
 }
