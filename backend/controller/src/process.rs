@@ -86,17 +86,17 @@ impl<'a> DockerBuilder<'a> {
         }
 
         let mut child = command.spawn()
-            .map_err(|e| ChildErrorKind::IOError(e, "spawn child"))?;
+            .map_err(|e| ChildErrorKind::IOError(e, "spawning child"))?;
 
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();
 
         unsafe {
             set_non_blocking(stdout.as_raw_fd())
-                .map_err(|e| ChildErrorKind::IOError(e, "set stdout to non blocking"))?;
+                .map_err(|e| ChildErrorKind::IOError(e, "setting stdout to non blocking"))?;
 
             set_non_blocking(stderr.as_raw_fd())
-                .map_err(|e| ChildErrorKind::IOError(e, "set stderr to non blocking"))?;
+                .map_err(|e| ChildErrorKind::IOError(e, "setting stderr to non blocking"))?;
         }
 
         Ok(DockerProcess {
@@ -208,13 +208,13 @@ impl DockerProcess {
                 Ok(n) => {
                     total_read += n;
                     output.push_str(
-                        std::str::from_utf8(&mut buff[0..n]).map_err(|_| ChildErrorKind::InvalidUtf8Character("read from src"))?,
+                        std::str::from_utf8(&mut buff[0..n]).map_err(|_| ChildErrorKind::InvalidUtf8Character("reading from src"))?,
                     );
                 }
                 Err(e) if std::io::ErrorKind::WouldBlock == e.kind() => break,
                 Err(e) => {
                     error!("failed to read from fd, {:?}", e);
-                    return Err(ChildErrorKind::IOError(e, "read from src"));
+                    return Err(ChildErrorKind::IOError(e, "reading from src"));
                 }
             }
         }
@@ -224,28 +224,28 @@ impl DockerProcess {
 
     pub fn kill(&mut self) -> Result<(), ChildErrorKind> {
         self.child.kill()
-            .map_err(|e| ChildErrorKind::IOError(e, "kill child process"))?;
+            .map_err(|e| ChildErrorKind::IOError(e, "killing child process"))?;
 
         let output = std::process::Command::new(self.docker_path.as_str())
             .args(&["kill", self.name.as_str()])
             .output()
-            .map_err(|e| ChildErrorKind::IOError(e, "call kill command on docker"))?;
+            .map_err(|e| ChildErrorKind::IOError(e, "calling kill command on docker"))?;
 
         if !output.status.success() {
-            error!("failed kill container");
+            error!("failed to kill container");
 
             let stdout = std::str::from_utf8(&output.stdout)
-                .map_err(|_| ChildErrorKind::InvalidUtf8Character("stdout of docker kill command"))?;
+                .map_err(|_| ChildErrorKind::InvalidUtf8Character("reading stdout of docker kill command"))?;
 
             let stderr = std::str::from_utf8(&output.stderr)
-                .map_err(|_| ChildErrorKind::InvalidUtf8Character("stderr of docker kill command"))?;
+                .map_err(|_| ChildErrorKind::InvalidUtf8Character("reading stderr of docker kill command"))?;
 
             error!("stdout: {}, stderr: {}", stdout, stderr);
         }
 
         // collect the child exit status. This is done to prevent child becoming zombie
         self.child.try_wait()
-            .map_err(|e| ChildErrorKind::IOError(e, "try_wait on child after killing"))?;
+            .map_err(|e| ChildErrorKind::IOError(e, "try waiting on child after killing"))?;
 
         Ok(())
     }
@@ -256,7 +256,7 @@ impl DockerProcess {
             Ok(None) => false,
             Err(e) => {
                 error!(
-                    "failed to try wait on child while checking is alive, {:?}",
+                    "failed to try wait on child while checking it is terminated, {:?}",
                     e
                 );
                 false
