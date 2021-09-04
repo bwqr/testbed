@@ -7,6 +7,7 @@ use crate::executor::Executor;
 use crate::messages::{RunMessage, UpdateExecutorMessage};
 
 mod connection;
+mod error;
 mod executor;
 mod process;
 mod messages;

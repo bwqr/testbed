@@ -11,7 +11,8 @@ use crate::connection::Connection;
 use crate::messages::{RunMessage, ControllerReceiversValueMessage, RunResultMessage, IsJobAborted};
 use crate::ModelId;
 use crate::state::{self, Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, State};
-use crate::process::{ChildError, ChildErrorKind, DockerBuilder, DockerProcess};
+use crate::process::{Error as ProcessError, ErrorKind as ProcessErrorKind, DockerBuilder, DockerProcess};
+use crate::error::ErrorCause;
 
 // in seconds
 const SEND_RECEIVERS_VALUES_INTERVAL: u64 = 10;
@@ -83,10 +84,10 @@ impl Executor {
         )
             .name("nrgtestbed-transmitter")
             .build()
-            .map_err(|e| Error::ChildErrorKind(e))?;
+            .map_err(|e| Error::ProcessErrorKind(e))?;
 
         process.wait(60)
-            .map_err(|e| Error::ChildError(e))
+            .map_err(|e| Error::ProcessError(e))
     }
 
     fn start_receiver(&self, script_dir: &str) -> Result<DockerProcess, Error> {
@@ -104,7 +105,7 @@ impl Executor {
             .name("nrgtestbed-receiver")
             .devices(&devices)
             .build()
-            .map_err(|e| Error::ChildErrorKind(e))
+            .map_err(|e| Error::ProcessErrorKind(e))
     }
 
     fn start_transmitter(&self) -> Result<serial::SystemPort, Error> {
@@ -164,11 +165,11 @@ impl Executor {
                     port.write(END_DELIMITER_NEW_LINE.as_bytes())
                        .map_err(|e| Error::IOError(e, "writing end delimiter new line"))?;
 
-                    return Ok(ExitReason::ChildExit);
+                    return Ok(ExitReason::ProcessExit);
                 }
 
                 receiver.read_pipes()
-                    .map_err(|e| Error::ChildErrorKind(e))?;
+                    .map_err(|e| Error::ProcessErrorKind(e))?;
 
                 match port.read(&mut buff) {
                     Ok(size) => {
@@ -226,20 +227,20 @@ impl Executor {
                     error!("failed to send end of experiment to receiver");
 
                     receiver.kill()
-                        .map_err(|e| Error::ChildErrorKind(e))?;
+                        .map_err(|e| Error::ProcessErrorKind(e))?;
 
                     return Err(Error::IOError(e, "sending end of experiment to receiver"));
                 }
 
                 info!("waiting for receiver to exit and generating the output");
                 receiver.wait(60)
-                   .map_err(|e| Error::ChildError(e))?
+                   .map_err(|e| Error::ProcessError(e))?
             }
-            Ok(ExitReason::ChildExit) => {
-                info!("child exited before experiment end");
+            Ok(ExitReason::ProcessExit) => {
+                info!("process exited before experiment end");
 
                 receiver.wait(1)
-                    .map_err(|e| Error::ChildError(e))?
+                    .map_err(|e| Error::ProcessError(e))?
             }
             Err(e) => {
                 // just kill everything without checking error and return error
@@ -346,15 +347,27 @@ impl Handler<RunMessage> for Executor {
 
 #[derive(Debug)]
 enum Error {
-    ChildError(ChildError),
-    ChildErrorKind(ChildErrorKind),
+    ProcessError(ProcessError),
+    ProcessErrorKind(ProcessErrorKind),
     IOError(io::Error, &'static str),
     SerialError(serial::Error, &'static str),
     JobAborted,
     Decoding(state::Error, String)
 }
 
+impl Error {
+    fn cause(&self) -> ErrorCause {
+        match self{
+            Error::ProcessError(e) => e.cause(),
+            Error::ProcessErrorKind(e) => e.cause(),
+            Error::IOError(_, _) | Error::SerialError(_, _) => ErrorCause::Internal,
+            Error::JobAborted => ErrorCause::Abort,
+            Error::Decoding(_, _) => ErrorCause::User,
+        }
+    }
+}
+
 enum ExitReason {
     EndOfExperiment,
-    ChildExit,
+    ProcessExit,
 }
