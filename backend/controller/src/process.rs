@@ -5,7 +5,7 @@ use std::{io, io::Read, process::Child};
 
 use log::{error, info};
 
-use crate::error::ErrorCause;
+use crate::error::{self, ErrorCause};
 
 const PYTHON_VERSION: &str = "3.9";
 const ALPINE_VERSION: &str = "3.13";
@@ -274,8 +274,11 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn cause(&self) -> ErrorCause {
-        self.kind.cause()
+    pub fn error(&self) -> error::Error {
+        let mut e = self.kind.error();
+        e.output = Some(self.output.clone());
+
+        e
     }
 }
 
@@ -290,8 +293,27 @@ pub enum ErrorKind {
 }
 
 impl ErrorKind {
-    pub fn cause(&self) -> ErrorCause {
-        ErrorCause::Abort
+    pub fn error(&self) -> error::Error {
+        match self {
+            ErrorKind::OutOfMemory => error::Error::new("OutOfMemory", ErrorCause::User),
+            ErrorKind::OutputLimitReached => error::Error::new("OutputLimitReached", ErrorCause::User),
+            ErrorKind::InvalidUtf8Character(context) => error::Error {
+                kind: "InvalidUtf8Character",
+                cause: ErrorCause::User,
+                detail: None,
+                context: Some(context),
+                output: None
+            },
+            ErrorKind::IOError(e, context) => error::Error {
+                kind: "IOError",
+                cause: ErrorCause::Internal,
+                detail: Some(format!("{:?}", e)),
+                context: Some(context),
+                output: None
+            },
+            ErrorKind::Crashed => error::Error::new("Crashed", ErrorCause::User),
+            ErrorKind::TimeOut => error::Error::new("TimeOut", ErrorCause::User)
+        }
     }
 }
 

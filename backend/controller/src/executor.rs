@@ -12,7 +12,7 @@ use crate::messages::{RunMessage, ControllerReceiversValueMessage, RunResultMess
 use crate::ModelId;
 use crate::state::{self, Decoder, END_DELIMITER_NEW_LINE, START_DELIMITER_NEW_LINE, State};
 use crate::process::{Error as ProcessError, ErrorKind as ProcessErrorKind, DockerBuilder, DockerProcess};
-use crate::error::ErrorCause;
+use crate::error::{self, ErrorCause};
 
 // in seconds
 const SEND_RECEIVERS_VALUES_INTERVAL: u64 = 10;
@@ -326,11 +326,13 @@ impl Handler<RunMessage> for Executor {
         let (output, successful) = match self.handle_execution(msg.job_id, msg.code) {
             Ok(output) => (output, true),
             Err(e) => {
-                info!("failed to execute experiment, {:?}", e);
+                let error = e.error();
+
+                info!("failed to execute experiment, {:?}", error.kind);
                 // just try to remove script files, even error originated from remove_script_files, we should try it.
                 let _ = Self::remove_dir(Self::gen_tmp_dir(job_id).as_str());
 
-                (format!("{:?}", e), false)
+                (serde_json::to_string(&error).unwrap(), false)
             }
         };
 
@@ -356,13 +358,32 @@ enum Error {
 }
 
 impl Error {
-    fn cause(&self) -> ErrorCause {
-        match self{
-            Error::ProcessError(e) => e.cause(),
-            Error::ProcessErrorKind(e) => e.cause(),
-            Error::IOError(_, _) | Error::SerialError(_, _) => ErrorCause::Internal,
-            Error::JobAborted => ErrorCause::Abort,
-            Error::Decoding(_, _) => ErrorCause::User,
+    fn error(&self) -> error::Error {
+        match self {
+            Error::ProcessError(e) => e.error(),
+            Error::ProcessErrorKind(e) => e.error(),
+            Error::IOError(e, context) => error::Error{
+                kind: "IOError",
+                cause: ErrorCause::Internal,
+                detail: Some(format!("{:?}", e)),
+                context: Some(context),
+                output:None,
+            },
+            Error::SerialError(e, context) => error::Error{
+                kind: "SerialError",
+                cause: ErrorCause::Internal,
+                detail: Some(format!("{:?}", e)),
+                context: Some(context),
+                output: None,
+            },
+            Error::Decoding(e, output) => error::Error{
+                kind: "DecodingError",
+                cause: ErrorCause::User,
+                detail: Some(format!("{:?}", e)),
+                context: None,
+                output: Some(output.clone()),
+            },
+            Error::JobAborted => error::Error::new("JobAborted", ErrorCause::Abort)
         }
     }
 }
