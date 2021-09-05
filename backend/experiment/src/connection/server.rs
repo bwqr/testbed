@@ -23,7 +23,7 @@ pub use crate::connection::messages::AbortRunningJob;
 struct ConnectedController {
     session: Addr<Session>,
     state: ControllerState,
-    receiver_values: Option<Vec<u8>>,
+    receiver_values: Option<Vec<u32>>,
 }
 
 #[derive(Message, Clone)]

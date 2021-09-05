@@ -262,6 +262,38 @@ impl Executor {
 impl Executor {
     fn send_receivers_values(act: &mut Executor, ctx: &mut <Self as Actor>::Context) {
         if let std::sync::TryLockResult::Ok(_) = act.rx_lock.try_lock() {
+            let read_value = |port:&mut serial::SystemPort| -> Result<u32, ()> {
+                let mut buff: [u8; 1] = [0; 1];
+                let mut res = Vec::<u8>::new();
+
+                loop {
+                    port.read(&mut buff)
+                        .map_err(|e| error!("failed to read while reading receiver values, {:?}", e))?;
+
+                    if buff[0] as char == '\n' {
+                        break;
+                    }
+                }
+
+                loop {
+                    port.read(&mut buff)
+                        .map_err(|e| error!("failed to read while reading receiver values, {:?}", e))?;
+
+                    if buff[0] as char == ' ' {
+                        break;
+                    } else {
+                        res.push(buff[0]);
+                    }
+                }
+
+                Ok(
+                    std::str::from_utf8(res.as_slice())
+                        .map_err(|_| error!("invalid utf-8 encoding in receiver value, {:?}", res))?
+                        .parse::<u32>()
+                        .map_err(|_| error!("failed to parse receiver value as u32, {:?}", res))?
+                    )
+            };
+
             let serials: Vec<Option<serial::SystemPort>> = act.rx_dev_paths.iter()
                 .map(|path| {
                     match serial::open(path) {
@@ -276,20 +308,15 @@ impl Executor {
                 })
                 .collect();
 
-            let mut values: Vec<u8> = Vec::with_capacity(serials.len());
+            let mut values: Vec<u32> = Vec::with_capacity(serials.len());
 
             for serial in serials {
-                match serial {
-                    Some(mut serial) => {
-                        let mut buff: [u8; 1] = [0];
+                let val = match serial {
+                    Some(mut serial) => read_value(&mut serial).unwrap_or(0),
+                    None => 0
+                };
 
-                        match serial.read(&mut buff) {
-                            Ok(_) => values.push(buff[0]),
-                            Err(_) => values.push(0)
-                        }
-                    }
-                    None => values.push(0)
-                }
+                values.push(val);
             }
 
             act.connection.do_send(ControllerReceiversValueMessage { values });

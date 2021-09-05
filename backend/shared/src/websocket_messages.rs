@@ -30,7 +30,7 @@ pub mod server {
 
     #[derive(Deserialize, Serialize)]
     pub struct ControllerReceiverValue {
-        pub values: Vec<u8>,
+        pub values: Vec<u32>,
     }
 }
 
