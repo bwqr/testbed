@@ -59,20 +59,20 @@ impl Executor {
         let file = String::from(script_dir) + "/job.py";
 
         std::fs::create_dir_all(script_dir)
-            .map_err(|e| Error::IOError(e, "creating script dir"))?;
+            .map_err(|e| Error::IO(e, "creating script dir"))?;
 
         let mut f = std::fs::File::create(file.as_str())
-            .map_err(|e| Error::IOError(e, "creating script file"))?;
+            .map_err(|e| Error::IO(e, "creating script file"))?;
 
         f.write(code.as_bytes())
-            .map_err(|e| Error::IOError(e, "writing script file"))?;
+            .map_err(|e| Error::IO(e, "writing script file"))?;
 
         Ok(())
     }
 
     fn remove_dir(script_dir: &str) -> Result<(), Error> {
         std::fs::remove_dir_all(script_dir)
-            .map_err(|e| Error::IOError(e, "removing script dir"))
+            .map_err(|e| Error::IO(e, "removing script dir"))
     }
 
     fn run_transmitter_code(&self, script_dir: &str) -> Result<String, Error> {
@@ -87,7 +87,7 @@ impl Executor {
             .map_err(|e| Error::ProcessErrorKind(e))?;
 
         process.wait(60)
-            .map_err(|e| Error::ProcessError(e))
+            .map_err(|e| Error::Process(e))
     }
 
     fn start_receiver(&self, script_dir: &str) -> Result<DockerProcess, Error> {
@@ -110,21 +110,21 @@ impl Executor {
 
     fn start_transmitter(&self) -> Result<serial::SystemPort, Error> {
         let mut port = serial::open(self.tx_dev_path.as_str())
-            .map_err(|e| Error::SerialError(e, "opening serial port"))?;
+            .map_err(|e| Error::Serial(e, "opening serial port"))?;
 
         // Wait 5 seconds for SETUP_MESSAGE
         port.set_timeout(Duration::from_secs(5))
-            .map_err(|e| Error::SerialError(e, "setting serial port timeout"))?;
+            .map_err(|e| Error::Serial(e, "setting serial port timeout"))?;
 
         let mut buffer = [0 as u8; incoming::arduino::SETUP_MESSAGE.len()];
 
         // read the START_MESSAGE message, we do not check if received buffer equals to START_MESSAGE since it is mostly equal.
         port.read(&mut buffer)
-            .map_err(|e| Error::IOError(e, "reading from serial port"))?;
+            .map_err(|e| Error::IO(e, "reading from serial port"))?;
 
         // Other IO operations should have 1 second for timeout
         port.set_timeout(Duration::from_secs(1))
-            .map_err(|e| Error::SerialError(e, "setting serial port timeout"))?;
+            .map_err(|e| Error::Serial(e, "setting serial port timeout"))?;
 
         Ok(port)
     }
@@ -134,9 +134,9 @@ impl Executor {
 
         // clear previous characters from transmitter
         port.write("\n".as_bytes())
-            .map_err(|e| Error::IOError(e, "writing new line char"))?;
+            .map_err(|e| Error::IO(e, "writing new line char"))?;
         port.write(START_DELIMITER_NEW_LINE.as_bytes())
-            .map_err(|e| Error::IOError(e, "writing start delimiter new line"))?;
+            .map_err(|e| Error::IO(e, "writing start delimiter new line"))?;
 
 
         for command in state.into_iter() {
@@ -155,7 +155,7 @@ impl Executor {
             }
 
             port.write(command.as_bytes())
-                .map_err(|e| Error::IOError(e, "writing command to serial port"))?;
+                .map_err(|e| Error::IO(e, "writing command to serial port"))?;
 
             let mut total_read_size = 0;
 
@@ -163,7 +163,7 @@ impl Executor {
             loop {
                 if receiver.is_terminated() {
                     port.write(END_DELIMITER_NEW_LINE.as_bytes())
-                       .map_err(|e| Error::IOError(e, "writing end delimiter new line"))?;
+                       .map_err(|e| Error::IO(e, "writing end delimiter new line"))?;
 
                     return Ok(ExitReason::ProcessExit);
                 }
@@ -180,13 +180,13 @@ impl Executor {
                         }
                     }
                     Err(e) if std::io::ErrorKind::TimedOut == e.kind() => { },
-                    Err(e) => return Err(Error::IOError(e, "reading end message from serial port"))
+                    Err(e) => return Err(Error::IO(e, "reading end message from serial port"))
                 }
             }
         }
 
         port.write(END_DELIMITER_NEW_LINE.as_bytes())
-            .map_err(|e| Error::IOError(e, "writing end delimiter new line to end experiment"))?;
+            .map_err(|e| Error::IO(e, "writing end delimiter new line to end experiment"))?;
 
         Ok(ExitReason::EndOfExperiment)
     }
@@ -229,18 +229,18 @@ impl Executor {
                     receiver.kill()
                         .map_err(|e| Error::ProcessErrorKind(e))?;
 
-                    return Err(Error::IOError(e, "sending end of experiment to receiver"));
+                    return Err(Error::IO(e, "sending end of experiment to receiver"));
                 }
 
                 info!("waiting for receiver to exit and generating the output");
                 receiver.wait(60)
-                   .map_err(|e| Error::ProcessError(e))?
+                   .map_err(|e| Error::Process(e))?
             }
             Ok(ExitReason::ProcessExit) => {
                 info!("process exited before experiment end");
 
                 receiver.wait(1)
-                    .map_err(|e| Error::ProcessError(e))?
+                    .map_err(|e| Error::Process(e))?
             }
             Err(e) => {
                 // just kill everything without checking error and return error
@@ -349,10 +349,10 @@ impl Handler<RunMessage> for Executor {
 
 #[derive(Debug)]
 enum Error {
-    ProcessError(ProcessError),
+    Process(ProcessError),
     ProcessErrorKind(ProcessErrorKind),
-    IOError(io::Error, &'static str),
-    SerialError(serial::Error, &'static str),
+    IO(io::Error, &'static str),
+    Serial(serial::Error, &'static str),
     JobAborted,
     Decoding(state::Error, String)
 }
@@ -360,24 +360,24 @@ enum Error {
 impl Error {
     fn error(&self) -> error::Error {
         match self {
-            Error::ProcessError(e) => e.error(),
+            Error::Process(e) => e.error(),
             Error::ProcessErrorKind(e) => e.error(),
-            Error::IOError(e, context) => error::Error{
-                kind: "IOError",
+            Error::IO(e, context) => error::Error{
+                kind: "IO",
                 cause: ErrorCause::Internal,
                 detail: Some(format!("{:?}", e)),
                 context: Some(context),
                 output:None,
             },
-            Error::SerialError(e, context) => error::Error{
-                kind: "SerialError",
+            Error::Serial(e, context) => error::Error{
+                kind: "Serial",
                 cause: ErrorCause::Internal,
                 detail: Some(format!("{:?}", e)),
                 context: Some(context),
                 output: None,
             },
             Error::Decoding(e, output) => error::Error{
-                kind: "DecodingError",
+                kind: "Decoding",
                 cause: ErrorCause::User,
                 detail: Some(format!("{:?}", e)),
                 context: None,

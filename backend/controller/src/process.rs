@@ -88,17 +88,17 @@ impl<'a> DockerBuilder<'a> {
         }
 
         let mut child = command.spawn()
-            .map_err(|e| ErrorKind::IOError(e, "spawning child"))?;
+            .map_err(|e| ErrorKind::IO(e, "spawning child"))?;
 
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();
 
         unsafe {
             set_non_blocking(stdout.as_raw_fd())
-                .map_err(|e| ErrorKind::IOError(e, "setting stdout to non blocking"))?;
+                .map_err(|e| ErrorKind::IO(e, "setting stdout to non blocking"))?;
 
             set_non_blocking(stderr.as_raw_fd())
-                .map_err(|e| ErrorKind::IOError(e, "setting stderr to non blocking"))?;
+                .map_err(|e| ErrorKind::IO(e, "setting stderr to non blocking"))?;
         }
 
         Ok(DockerProcess {
@@ -216,7 +216,7 @@ impl DockerProcess {
                 Err(e) if std::io::ErrorKind::WouldBlock == e.kind() => break,
                 Err(e) => {
                     error!("failed to read from fd, {:?}", e);
-                    return Err(ErrorKind::IOError(e, "reading from src"));
+                    return Err(ErrorKind::IO(e, "reading from src"));
                 }
             }
         }
@@ -226,12 +226,12 @@ impl DockerProcess {
 
     pub fn kill(&mut self) -> Result<(), ErrorKind> {
         self.child.kill()
-            .map_err(|e| ErrorKind::IOError(e, "killing child process"))?;
+            .map_err(|e| ErrorKind::IO(e, "killing child process"))?;
 
         let output = std::process::Command::new(self.docker_path.as_str())
             .args(&["kill", self.name.as_str()])
             .output()
-            .map_err(|e| ErrorKind::IOError(e, "calling kill command on docker"))?;
+            .map_err(|e| ErrorKind::IO(e, "calling kill command on docker"))?;
 
         if !output.status.success() {
             error!("failed to kill container");
@@ -247,7 +247,7 @@ impl DockerProcess {
 
         // collect the child exit status. This is done to prevent child becoming zombie
         self.child.try_wait()
-            .map_err(|e| ErrorKind::IOError(e, "try waiting on child after killing"))?;
+            .map_err(|e| ErrorKind::IO(e, "try waiting on child after killing"))?;
 
         Ok(())
     }
@@ -286,7 +286,7 @@ impl Error {
 pub enum ErrorKind {
     OutputLimitReached,
     InvalidUtf8Character(&'static str),
-    IOError(io::Error, &'static str),
+    IO(io::Error, &'static str),
     Crashed,
     OutOfMemory,
     TimeOut,
@@ -304,7 +304,7 @@ impl ErrorKind {
                 context: Some(context),
                 output: None
             },
-            ErrorKind::IOError(e, context) => error::Error {
+            ErrorKind::IO(e, context) => error::Error {
                 kind: "IOError",
                 cause: ErrorCause::Internal,
                 detail: Some(format!("{:?}", e)),
