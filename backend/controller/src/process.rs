@@ -1,14 +1,14 @@
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::process::{ExitStatus, Stdio, ChildStdout, ChildStderr};
+use std::process::{Stdio, ChildStdout, ChildStderr};
 use std::time::Duration;
 use std::{io, io::Read, process::Child};
 
-use log::error;
+use log::{error, info};
+
+use crate::error::{self, ErrorCause};
 
 const PYTHON_VERSION: &str = "3.9";
 const ALPINE_VERSION: &str = "3.13";
-
-const INVALID_UTF8_ENCODING: &'static str = "invalid utf-8 encoding in the output";
 
 mod limits {
     pub const MEMORY: &str = "512m";
@@ -20,7 +20,7 @@ pub struct DockerBuilder<'a> {
     docker_path: &'a str,
     python_lib_path: &'a str,
     script_dir: &'a str,
-    exec: &'a [&'static str],
+    exec: &'a [&'a str],
     name: Option<&'a str>,
     devices: Option<&'a [&'a str]>,
 }
@@ -49,7 +49,7 @@ impl<'a> DockerBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> Result<DockerProcess, &'static str> {
+    pub fn build(self) -> Result<DockerProcess, ErrorKind> {
         let mut command = std::process::Command::new(self.docker_path);
 
         command
@@ -88,17 +88,17 @@ impl<'a> DockerBuilder<'a> {
         }
 
         let mut child = command.spawn()
-            .map_err(|_| "faile to spawn child")?;
+            .map_err(|e| ErrorKind::IO(e, "spawning child"))?;
 
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();
 
         unsafe {
             set_non_blocking(stdout.as_raw_fd())
-                .map_err(|_| "failed to set stdout to non blocking")?;
+                .map_err(|e| ErrorKind::IO(e, "setting stdout to non blocking"))?;
 
             set_non_blocking(stderr.as_raw_fd())
-                .map_err(|_| "failed to set stderr to non blocking")?;
+                .map_err(|e| ErrorKind::IO(e, "setting stderr to non blocking"))?;
         }
 
         Ok(DockerProcess {
@@ -122,26 +122,36 @@ pub struct DockerProcess {
 }
 
 impl DockerProcess {
-    pub fn wait(mut self, seconds: u64) -> Result<String, &'static str> {
-        let mut exited = false;
-        let mut fail_reason: Option<&'static str> = None;
+    pub fn wait(mut self, seconds: u64) -> Result<String, Error> {
+        match self._wait(seconds) {
+            Ok(_) => Ok(self.output),
+            Err(e) => {
+                // only out of memory and crashed kinds do not need to kill the child process
+                match e {
+                    ErrorKind::OutOfMemory | ErrorKind::Crashed => {},
+                    _ => self.kill().map_err(|e| Error { output: self.output.clone(), kind: e })?
+                }
 
+                Err(Error { output: self.output, kind: e })
+            }
+        }
+    }
+
+    fn _wait(&mut self, seconds: u64) -> Result<(), ErrorKind> {
         for _ in 0..seconds {
             self.read_pipes()?;
 
             match self.child.try_wait() {
                 Ok(Some(status)) => {
-                    exited = true;
-
                     if let Some(137) = status.code() {
-                        fail_reason = Some("child is killed, probably due to out of memory");
+                        return Err(ErrorKind::OutOfMemory);
                     }
 
                     if !status.success() {
-                        fail_reason = Some("child is crashed");
+                        return Err(ErrorKind::Crashed);
                     }
 
-                    break;
+                    return Ok(());
                 }
                 Ok(None) => {}
                 Err(e) => {
@@ -152,55 +162,44 @@ impl DockerProcess {
             std::thread::sleep(Duration::from_secs(1));
         }
 
-        if !exited {
-            let _ = self.kill();
+        info!("process did not exit in given time limit");
 
-            fail_reason = Some("child did not exit for given time, it is killed");
-        }
-
-        if let Some(reason) = fail_reason {
-            error!("{}", self.output);
-            return Err(reason);
-        }
-
-        Ok(self.output)
+        Err(ErrorKind::TimeOut)
     }
 
-    pub fn read_pipes(&mut self) -> Result<(), &'static str> {
-        let max_read = self.remaining_output_limit()?;
+    pub fn read_pipes(&mut self) -> Result<(), ErrorKind> {
+        let max_read = self.remaining_output_limit();
         Self::read(&mut self.stdout, &mut self.output, max_read)?;
 
-        let max_read = self.remaining_output_limit()?;
+        let max_read = self.remaining_output_limit();
         Self::read(&mut self.stderr, &mut self.output, max_read)?;
 
         if limits::OUTPUT == self.output.len() {
-            Err("output limit is reached")
+            Err(ErrorKind::OutputLimitReached)
         } else {
             Ok(())
         }
     }
 
-    fn remaining_output_limit(&self) -> Result<usize, &'static str> {
+    fn remaining_output_limit(&self) -> usize {
         let opt = limits::OUTPUT.checked_sub(self.output.len());
 
-        if let Some(res) = opt {
-            Ok(res)
-        } else {
-            // Controller should not put itself into this state. This is just just to inform us.
+        if let None = opt {
             error!(
                 "BUG output limit length is smaller than output length, limit {}, output {}",
                 limits::OUTPUT,
                 self.output.len()
-            );
-            Err("overflow occurred while calculating the remaining output limit")
+            )
         }
+
+        opt.unwrap_or(0)
     }
 
     fn read<T: Read>(
         src: &mut T,
         output: &mut String,
         max_read: usize,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), ErrorKind> {
         const BUFF_LENGTH: usize = 1024;
         let mut buff = [0; BUFF_LENGTH];
         let mut total_read = 0;
@@ -211,13 +210,13 @@ impl DockerProcess {
                 Ok(n) => {
                     total_read += n;
                     output.push_str(
-                        std::str::from_utf8(&mut buff[0..n]).map_err(|_| INVALID_UTF8_ENCODING)?,
+                        std::str::from_utf8(&mut buff[0..n]).map_err(|_| ErrorKind::InvalidUtf8Character("reading from src"))?,
                     );
                 }
                 Err(e) if std::io::ErrorKind::WouldBlock == e.kind() => break,
                 Err(e) => {
                     error!("failed to read from fd, {:?}", e);
-                    return Err("an error occurred while reading from fd");
+                    return Err(ErrorKind::IO(e, "reading from src"));
                 }
             }
         }
@@ -225,35 +224,100 @@ impl DockerProcess {
         Ok(())
     }
 
-    pub fn kill(&mut self) -> io::Result<()> {
-        self.child.kill()?;
+    pub fn kill(&mut self) -> Result<(), ErrorKind> {
+        self.child.kill()
+            .map_err(|e| ErrorKind::IO(e, "killing child process"))?;
 
-        std::process::Command::new(self.docker_path.as_str())
+        let output = std::process::Command::new(self.docker_path.as_str())
             .args(&["kill", self.name.as_str()])
-            .output()?;
+            .output()
+            .map_err(|e| ErrorKind::IO(e, "calling kill command on docker"))?;
+
+        if !output.status.success() {
+            error!("failed to kill container");
+
+            let stdout = std::str::from_utf8(&output.stdout)
+                .map_err(|_| ErrorKind::InvalidUtf8Character("reading stdout of docker kill command"))?;
+
+            let stderr = std::str::from_utf8(&output.stderr)
+                .map_err(|_| ErrorKind::InvalidUtf8Character("reading stderr of docker kill command"))?;
+
+            error!("stdout: {}, stderr: {}", stdout, stderr);
+        }
 
         // collect the child exit status. This is done to prevent child becoming zombie
-        self.child.try_wait()?;
+        self.child.try_wait()
+            .map_err(|e| ErrorKind::IO(e, "try waiting on child after killing"))?;
 
         Ok(())
     }
 
-    pub fn is_terminated(&mut self) -> Option<ExitStatus> {
+    pub fn is_terminated(&mut self) -> bool {
         match self.child.try_wait() {
-            Ok(Some(status)) => Some(status),
-            Ok(None) => None,
+            Ok(Some(_)) => true,
+            Ok(None) => false,
             Err(e) => {
                 error!(
-                    "failed to try wait on child while checking is alive, {:?}",
+                    "failed to try wait on child while checking it is terminated, {:?}",
                     e
                 );
-                None
+                false
             }
         }
     }
 }
 
-unsafe fn set_non_blocking(fd: RawFd) -> Result<(), ()> {
+#[derive(Debug)]
+pub struct Error {
+    output: String,
+    kind: ErrorKind
+}
+
+impl Error {
+    pub fn error(&self) -> error::Error {
+        let mut e = self.kind.error();
+        e.output = Some(self.output.clone());
+
+        e
+    }
+}
+
+#[derive(Debug)]
+pub enum ErrorKind {
+    OutputLimitReached,
+    InvalidUtf8Character(&'static str),
+    IO(io::Error, &'static str),
+    Crashed,
+    OutOfMemory,
+    TimeOut,
+}
+
+impl ErrorKind {
+    pub fn error(&self) -> error::Error {
+        match self {
+            ErrorKind::OutOfMemory => error::Error::new("OutOfMemory", ErrorCause::User),
+            ErrorKind::OutputLimitReached => error::Error::new("OutputLimitReached", ErrorCause::User),
+            ErrorKind::InvalidUtf8Character(context) => error::Error {
+                kind: "InvalidUtf8Character",
+                cause: ErrorCause::User,
+                detail: None,
+                context: Some(context),
+                output: None
+            },
+            ErrorKind::IO(e, context) => error::Error {
+                kind: "IOError",
+                cause: ErrorCause::Internal,
+                detail: Some(format!("{:?}", e)),
+                context: Some(context),
+                output: None
+            },
+            ErrorKind::Crashed => error::Error::new("Crashed", ErrorCause::User),
+            ErrorKind::TimeOut => error::Error::new("TimeOut", ErrorCause::User)
+        }
+    }
+}
+
+unsafe fn set_non_blocking(fd: RawFd) -> Result<(), io::Error> {
     if libc::fcntl(
         fd,
         libc::F_SETFL,
@@ -261,11 +325,11 @@ unsafe fn set_non_blocking(fd: RawFd) -> Result<(), ()> {
     ) < 0
     {
         error!(
-            "call to fcntl for setting non blocking stdout failed, errno {}",
+            "call to fcntl for setting fd to non blocking failed, errno {}",
             *libc::__errno_location()
         );
 
-        return Err(());
+        return Err(io::Error::from_raw_os_error(*libc::__errno_location()));
     }
 
     Ok(())
