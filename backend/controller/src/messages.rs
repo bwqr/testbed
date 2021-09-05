@@ -20,7 +20,7 @@ pub struct RunResultMessage {
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct ControllerReceiversValueMessage {
-    pub values: Vec<u8>,
+    pub values: Vec<u32>,
 }
 
 #[derive(Message)]

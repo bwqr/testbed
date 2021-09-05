@@ -38,7 +38,7 @@ pub struct RunResultMessage {
 #[rtype(result = "()")]
 pub struct UpdateControllerValue {
     pub controller_id: ModelId,
-    pub values: Vec<u8>,
+    pub values: Vec<u32>,
 }
 
 pub struct ReceiverValues {
@@ -46,7 +46,7 @@ pub struct ReceiverValues {
 }
 
 impl Message for ReceiverValues {
-    type Result = Result<Option<Vec<u8>>, ()>;
+    type Result = Result<Option<Vec<u32>>, ()>;
 }
 
 #[derive(Message)]
