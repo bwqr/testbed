@@ -108,6 +108,37 @@ impl Executor {
             .map_err(|e| Error::ProcessErrorKind(e))
     }
 
+    fn syncronize_receiver(receiver: &mut DockerProcess) -> Result<(), Error> {
+        let sleep_time = 1;
+        let socket_addr = SocketAddr::from(([127,0,0,1], 8011));
+
+        for _ in 0..10 {
+            if receiver.is_terminated() {
+                return Err(Error::EarlyExit);
+            }
+
+            let res = std::net::TcpStream::connect_timeout(&socket_addr, Duration::from_secs(1));
+
+            if let Ok(mut stream) = res {
+                stream.set_read_timeout(Some(Duration::from_secs(1)))
+                    .map_err(|e| Error::IO(e, "setting read timeout of stream"))?;
+
+                let mut buff = [0;32];
+
+                match stream.read(&mut buff) {
+                    Ok(0) => {},
+                    Ok(_) => return Ok(()),
+                    Err(e) => error!("failed to read from stream, {:?}", e)
+                };
+            }
+
+            info!("could not connect to receiver, sleeping for {} seconds", sleep_time);
+            std::thread::sleep(Duration::from_secs(sleep_time));
+        }
+
+        Err(Error::IO(io::Error::from(io::ErrorKind::ConnectionRefused), "connecting to receiver"))
+    }
+
     fn start_transmitter(&self) -> Result<serial::SystemPort, Error> {
         let mut port = serial::open(self.tx_dev_path.as_str())
             .map_err(|e| Error::Serial(e, "opening serial port"))?;
@@ -129,7 +160,7 @@ impl Executor {
         Ok(port)
     }
 
-    fn run_commands(&self, state: State, port: &mut serial::SystemPort, receiver: &mut DockerProcess) -> Result<ExitReason, Error> {
+    fn run_commands(&self, state: State, port: &mut serial::SystemPort, receiver: &mut DockerProcess) -> Result<(), Error> {
         let mut buff = [0 as u8; incoming::arduino::END_MESSAGE.len()];
 
         // clear previous characters from transmitter
@@ -165,7 +196,7 @@ impl Executor {
                     port.write(END_DELIMITER_NEW_LINE.as_bytes())
                        .map_err(|e| Error::IO(e, "writing end delimiter new line"))?;
 
-                    return Ok(ExitReason::ProcessExit);
+                    return Err(Error::EarlyExit);
                 }
 
                 receiver.read_pipes()
@@ -188,7 +219,7 @@ impl Executor {
         port.write(END_DELIMITER_NEW_LINE.as_bytes())
             .map_err(|e| Error::IO(e, "writing end delimiter new line to end experiment"))?;
 
-        Ok(ExitReason::EndOfExperiment)
+        Ok(())
     }
 
     fn send_end_of_experiment() -> Result<(), io::Error> {
@@ -218,9 +249,24 @@ impl Executor {
         info!("starting the receiver");
         let mut receiver = self.start_receiver(script_dir.as_str())?;
 
+        info!("syncronizing the receiver");
+        match Self::syncronize_receiver(&mut receiver) {
+            Ok(()) => {},
+            Err(Error::EarlyExit) => {
+                info!("receiver is exited early");
+                return receiver.wait(1).map_err(|e| Error::Process(e))
+            },
+            Err(e) => {
+                receiver.kill()
+                    .map_err(|e| Error::ProcessErrorKind(e))?;
+
+                return Err(e);
+            }
+        };
+
         info!("running commands");
         let output = match self.run_commands(state, &mut port, &mut receiver) {
-            Ok(ExitReason::EndOfExperiment) => {
+            Ok(_) => {
                 info!("experiment is ended");
 
                 if let Err(e) = Self::send_end_of_experiment() {
@@ -233,15 +279,13 @@ impl Executor {
                 }
 
                 info!("waiting for receiver to exit and generating the output");
-                receiver.wait(60)
+                receiver.wait(5)
                    .map_err(|e| Error::Process(e))?
-            }
-            Ok(ExitReason::ProcessExit) => {
-                info!("process exited before experiment end");
-
-                receiver.wait(1)
-                    .map_err(|e| Error::Process(e))?
-            }
+            },
+            Err(Error::EarlyExit) => {
+                info!("receiver is exited early");
+                return Ok(receiver.wait(1).map_err(|e| Error::Process(e))?)
+            },
             Err(e) => {
                 // just kill everything without checking error and return error
                 let _ = port.write(END_DELIMITER_NEW_LINE.as_bytes());
@@ -381,6 +425,7 @@ enum Error {
     IO(io::Error, &'static str),
     Serial(serial::Error, &'static str),
     JobAborted,
+    EarlyExit,
     Decoding(state::Error, String)
 }
 
@@ -389,33 +434,29 @@ impl Error {
         match self {
             Error::Process(e) => e.error(),
             Error::ProcessErrorKind(e) => e.error(),
-            Error::IO(e, context) => error::Error{
+            Error::IO(e, context) => error::Error {
                 kind: "IO",
                 cause: ErrorCause::Internal,
                 detail: Some(format!("{:?}", e)),
                 context: Some(context),
                 output:None,
             },
-            Error::Serial(e, context) => error::Error{
+            Error::Serial(e, context) => error::Error {
                 kind: "Serial",
                 cause: ErrorCause::Internal,
                 detail: Some(format!("{:?}", e)),
                 context: Some(context),
                 output: None,
             },
-            Error::Decoding(e, output) => error::Error{
+            Error::Decoding(e, output) => error::Error {
                 kind: "Decoding",
                 cause: ErrorCause::User,
                 detail: Some(format!("{:?}", e)),
                 context: None,
                 output: Some(output.clone()),
             },
-            Error::JobAborted => error::Error::new("JobAborted", ErrorCause::Abort)
+            Error::JobAborted => error::Error::new("JobAborted", ErrorCause::Abort),
+            Error::EarlyExit => error::Error::new("EarlyExit", ErrorCause::User)
         }
     }
-}
-
-enum ExitReason {
-    EndOfExperiment,
-    ProcessExit,
 }
