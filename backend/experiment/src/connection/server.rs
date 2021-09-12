@@ -2,13 +2,14 @@ use std::collections::HashMap;
 
 use actix::prelude::*;
 use actix_web::web;
+use chrono::Utc;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use log::{error, info};
 use serde::Serialize;
 
 use core::db::DieselEnum;
-use core::schema::{experiments, jobs};
+use core::schema::{experiments, jobs, slots};
 use core::types::{DBPool, ModelId};
 use service::{Notification, NotificationKind, NotificationMessage, NotificationServer};
 use shared::ControllerState;
@@ -52,11 +53,18 @@ impl ExperimentServer {
 
     async fn try_next_job(conn: PooledConnection<ConnectionManager<PgConnection>>, controller_id: ModelId) -> Option<RunExperiment> {
         web::block(move || {
-            // TODO https://trello.com/c/1qCVgmn6
+            let now = Utc::now().naive_utc();
+
+            let slot_owner_id = slots::table
+                .filter(slots::start_at.le(&now).and(slots::end_at.ge(&now)))
+                .select(slots::user_id)
+                .first::<ModelId>(&conn)?;
+
             jobs::table
                 .inner_join(experiments::table)
                 .filter(jobs::status.eq(JobStatus::Pending.value()))
                 .filter(jobs::controller_id.eq(controller_id))
+                .filter(experiments::user_id.eq(slot_owner_id))
                 .select((experiments::user_id, jobs::id, jobs::code))
                 .first::<(ModelId, ModelId, String)>(&conn)
                 .map(|job| RunExperiment {
@@ -120,8 +128,6 @@ impl ExperimentServer {
                     Ok(_) => JobStatus::Running,
                     Err(e) => {
                         error!("Error while sending job to controller, {:?}", e);
-                        // TODO https://trello.com/c/nqKV1x8B
-                        // schedule another job, update controller state to Idle
                         JobStatus::Failed
                     }
                 };
