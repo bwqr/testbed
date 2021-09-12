@@ -53,7 +53,7 @@ pub async fn fetch_slot(pool: web::Data<DBPool>, user: User, slot_id: web::Path<
 }
 
 #[get("slots/reserved")]
-pub async fn fetch_resolved_slots(pool: web::Data<DBPool>, query: web::Query<ReservedQueryRequest>) -> Result<Json<Vec<NaiveDateTime>>> {
+pub async fn fetch_reserved_slots(pool: web::Data<DBPool>, query: web::Query<ReservedQueryRequest>) -> Result<Json<Vec<NaiveDateTime>>> {
     let conn = pool.get().unwrap();
     let query = query.into_inner();
 

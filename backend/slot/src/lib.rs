@@ -14,7 +14,7 @@ pub fn register(config: &mut web::ServiceConfig) {
             web::scope("/api/slot")
                 .wrap(Auth)
                 .service(handlers::fetch_slots)
-                .service(handlers::fetch_resolved_slots)
+                .service(handlers::fetch_reserved_slots)
                 .service(handlers::fetch_slot)
                 .service(handlers::reserve_slot)
                 .service(handlers::delete_slot)
