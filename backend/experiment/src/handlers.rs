@@ -9,7 +9,7 @@ use serde_json::json;
 use core::db::DieselEnum;
 use core::error::ErrorMessaging;
 use core::models::paginate::{CountStarOver, Paginate, Pagination, PaginationRequest};
-use core::responses::SuccessResponse;
+use core::responses::{SuccessResponse, TokenResponse};
 use core::sanitized::SanitizedJson;
 use core::schema::{experiments, jobs, controllers, slots};
 use core::types::{DBPool, DefaultResponse, ModelId, Result};
@@ -421,4 +421,24 @@ pub async fn delete_experiment(
     .await?;
 
     Ok(Json(SuccessResponse::default()))
+}
+
+#[get("controller/{id}/token")]
+pub async fn controller_token(pool: web::Data<DBPool>, hash: web::Data<Hash>, controller_id: web::Path<ModelId>) -> Result<Json<TokenResponse>> {
+    let conn = pool.get().unwrap();
+
+    let access_key = web::block(move ||
+                                controllers::table.find(controller_id.into_inner())
+                                .select(controllers::access_key)
+                                .first(&conn)
+        )
+        .await?;
+
+    let token = hash.encode::<ControllerToken>(&ControllerToken{
+        access_key,
+        exp: std::i64::MAX
+    })
+        .map_err(|_| CoreErrorMessage::HashFailed)?;
+
+    Ok(Json(TokenResponse{token}))
 }

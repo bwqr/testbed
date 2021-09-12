@@ -37,6 +37,7 @@ pub fn register(config: &mut web::ServiceConfig) {
                             web::scope("")
                                 .wrap(AdminUser)
                                 .service(handlers::controller_receiver_values)
+                                .service(handlers::controller_token)
                         )
                 )
         );
