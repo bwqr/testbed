@@ -5,7 +5,7 @@ use actix_web::web;
 use chrono::Utc;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
-use log::{error, info};
+use log::{error, info, warn};
 use serde::Serialize;
 
 use core::db::DieselEnum;
@@ -239,11 +239,19 @@ impl Handler<RunResultMessage> for ExperimentServer {
         info!("got result {} id {}", msg.successful, msg.job_id);
 
         if let Some(controller) = self.controllers.get_mut(&msg.controller_id) {
-            // TODO Maybe controller sent an older job's result, so we should check if currently running job
-            // is equal to received msg.job_id
+            match controller.state {
+                ControllerState::Running(job_id) if job_id != msg.job_id => {
+                    warn!("controller sent a job result other than it is running currently, running {} received {}", job_id, msg.job_id)
+                },
+                ControllerState::Running(_) => {},
+                ControllerState::Idle => warn!("controller sent a job result while it is in the Idle state")
+            }
+
             controller.state = ControllerState::Idle;
+
             let conn = self.pool.get().unwrap();
             let controller_id = msg.controller_id;
+
             async move {
                 Self::try_next_job(conn, controller_id)
                     .await
