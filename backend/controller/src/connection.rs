@@ -5,7 +5,7 @@ use actix::io::SinkWrite;
 use actix::prelude::*;
 use actix::{Actor, Context, StreamHandler, WrapFuture};
 use actix_codec::Framed;
-use awc::error::{WsClientError, WsProtocolError};
+use awc::error::{SendRequestError, WsClientError, WsProtocolError};
 use awc::ws::{Codec, Frame, Message};
 use awc::{BoxedSocket, Client};
 use futures::stream::{SplitSink, StreamExt};
@@ -59,7 +59,12 @@ impl Connection {
         ctx: &mut <Self as Actor>::Context,
     ) -> Result<(), SocketErrorKind> {
         match frame {
-            Frame::Ping(_) | Frame::Pong(_) => {}
+            Frame::Ping(msg) => {
+                if let Some(sink) = &mut self.sink {
+                    sink.write(Message::Pong(msg));
+                }
+            },
+            Frame::Pong(_) => {}
             Frame::Text(bytes) => {
                 let text = String::from_utf8(bytes.to_vec())
                     .map_err(|_| SocketErrorKind::InvalidMessage)?;
@@ -109,7 +114,7 @@ impl Connection {
                                 info!("Setting is_job_aborted to true");
                                 self.is_job_aborted = true;
                             },
-                            ControllerState::Running(job_id) => error!("Server sent an abort message for a different job from current running job, received {}, running {}", abort_job.data.job_id, job_id),
+                            ControllerState::Running(job_id) => error!("Server sent an abort message for a different job from currently running job, received {}, running {}", abort_job.data.job_id, job_id),
                             ControllerState::Idle => error!("Server sent an abort message even though controller is idle")
                         }
                     }
@@ -164,23 +169,7 @@ impl Connection {
                     std::mem::swap(&mut pending_messages, &mut act.pending_messages);
 
                     while let Some(msg) = pending_messages.pop() {
-                        Self::upload_output_to_server(
-                            msg,
-                            act.server_url.clone(),
-                            act.access_token.clone(),
-                        )
-                        .into_actor(act)
-                        .then(|res, act, _| {
-                            let (msg, sent) = res;
-                            if sent {
-                                act.send_msg_to_server(msg);
-                            } else {
-                                act.pending_messages.push(msg);
-                            }
-
-                            fut::ready(())
-                        })
-                        .spawn(ctx);
+                        act.handle_run_result(msg, ctx);
                     }
 
                     // we have connected now, reset timing
@@ -227,7 +216,7 @@ impl Connection {
         msg: RunResultMessage,
         server_url: String,
         access_token: String,
-    ) -> (RunResultMessage, bool) {
+    ) -> (RunResultMessage, Option<SendRequestError>)  {
         let res = Client::new()
             .post(format!(
                 "{}/experiment/job/{}/output?token={}",
@@ -236,17 +225,47 @@ impl Connection {
             .send_body(&msg.output)
             .await;
 
-        (msg, res.is_ok())
+        let opt = match res {
+            Ok(_) => None,
+            Err(e) => Some(e)
+        };
+
+        (msg, opt)
     }
 
-    fn send_msg_to_server(&mut self, msg: RunResultMessage) {
+    fn send_msg_to_server(&mut self, msg: RunResultMessage) -> Option<RunResultMessage> {
         if let Some(sink) = &mut self.sink {
             if let Some(_) = sink.write(Self::serialize_result(&msg)) {
-                self.pending_messages.push(msg);
+                return Some(msg);
             }
         } else {
-            self.pending_messages.push(msg);
+            return Some(msg);
         }
+
+        None
+    }
+
+    fn handle_run_result(&mut self, msg: RunResultMessage, ctx: &mut Context<Self>) {
+        Self::upload_output_to_server(
+            msg,
+            self.server_url.clone(),
+            self.access_token.clone(),
+        )
+            .into_actor(self)
+            .then(|res, act, _| {
+                if let Some(e) = res.1 {
+                    error!("failed to send output to backend, {:?}", e);
+                    act.pending_messages.push(res.0);
+                } else {
+                    if let Some(msg) = act.send_msg_to_server(res.0) {
+                        error!("failed to send run result to backend");
+                        act.pending_messages.push(msg);
+                    }
+                }
+
+                fut::ready(())
+            })
+            .spawn(ctx);
     }
 }
 
@@ -318,19 +337,7 @@ impl Handler<RunResultMessage> for Connection {
         self.controller_state = ControllerState::Idle;
         self.is_job_aborted = false;
 
-        Self::upload_output_to_server(msg, self.server_url.clone(), self.access_token.clone())
-            .into_actor(self)
-            .then(move |res, act, _| {
-                let (msg, sent) = res;
-                if sent {
-                    act.send_msg_to_server(msg)
-                } else {
-                    act.pending_messages.push(msg);
-                }
-
-                fut::ready(())
-            })
-            .spawn(ctx);
+        self.handle_run_result(msg, ctx);
     }
 }
 

@@ -243,8 +243,7 @@ impl Handler<RunResultMessage> for ExperimentServer {
                 ControllerState::Running(job_id) if job_id != msg.job_id => {
                     warn!("controller sent a job result other than it is running currently, running {} received {}", job_id, msg.job_id)
                 },
-                ControllerState::Running(_) => {},
-                ControllerState::Idle => warn!("controller sent a job result while it is in the Idle state")
+                _ => {},
             }
 
             controller.state = ControllerState::Idle;
