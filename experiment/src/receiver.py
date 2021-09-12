@@ -5,10 +5,11 @@ from typing import Tuple, List
 
 from serial import Serial
 
+from log import debug
 
 class Outgoing:
-    pass
-
+    class Tcp:
+        start_of_experiment = "start_of_experiment"
 
 class Incoming:
     class Tcp:
@@ -25,17 +26,38 @@ class Connection(threading.Thread):
         self.__socket.listen(1)
         self.__socket.settimeout(1)
 
+        while True:
+            try:
+                debug('accepting new connection')
+
+                conn, _ = self.__socket.accept()
+
+                debug('a connection is accepted')
+
+                conn.send(Outgoing.Tcp.start_of_experiment.encode('utf-8'))
+                conn.close()
+
+                break
+            except socket.timeout:
+                debug('failed to accept connection, time out')
+
         super(Connection, self).__init__(*args, **kwargs)
 
     def run(self) -> None:
         global is_experiment_ended
 
-        # run until main thread terminates or receiving a connection
+        # run until main thread terminates or Connection thread receives a connection
         while threading.main_thread().is_alive():
             try:
-                conn, addr = self.__socket.accept()
-                conn.close()
+                debug('waiting for the end of experiment')
+
+                conn, _ = self.__socket.accept()
+                conn.recv(len(Incoming.Tcp.end_of_experiment))
+
                 is_experiment_ended = True
+
+                debug('received end of experiment')
+
                 break
             except socket.timeout:
                 pass
@@ -47,6 +69,7 @@ class Receiver:
     def __init__(self, device_paths: List[str], sample_frequency):
         if sample_frequency <= 0:
             raise ValueError('sample rate cannot be less than or equal to zero')
+
         self.__sample_frequency = sample_frequency
 
         self.__devs = list(map(lambda path: Serial(path, 9600), device_paths))
@@ -84,7 +107,7 @@ class Receiver:
             time.sleep(sleep_time)
         else:
             # receiver could not keep up with sampling rate
-            pass
+            debug('receiver could not keep up with sampling rate, time difference {}'.format(-sleep_time))
 
         return is_experiment_ended, read_data
 
